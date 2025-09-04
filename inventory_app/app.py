@@ -329,40 +329,75 @@ def items_new():
             conn.close()
     return render_template("item_form.html", form=form, mode="new")
 
-@app.route("/items/<inventory_id>/edit", methods=["GET","POST"])
+@app.route("/items/<inventory_id>/edit", methods=["GET", "POST"])
 @login_required
 def items_edit(inventory_id):
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT inventory_id,name,category,description,serial_number,manufacturer,model FROM items WHERE inventory_id=%s", (inventory_id,))
+    cur.execute("""SELECT inventory_id, name, category, description, serial_number, manufacturer, model
+                   FROM items WHERE inventory_id=%s""", (inventory_id,))
     row = cur.fetchone()
     if not row:
         cur.close()
         conn.close()
         abort(404)
-    form = ItemForm(data={
-        "inventory_id": row[0],
+
+    # Original data for comparison
+    original_data = {
         "name": row[1],
         "category": row[2],
         "description": row[3],
         "serial_number": row[4],
         "manufacturer": row[5],
         "model": row[6],
-    })
+    }
+
+    form = ItemForm(data=original_data)
     if request.method == "POST" and form.validate_on_submit():
         try:
-            cur.execute("""UPDATE items SET name=%s, category=%s, description=%s, serial_number=%s,
-                           manufacturer=%s, model=%s WHERE inventory_id=%s""",
-                        (form.name.data.strip(), form.category.data.strip() if form.category.data else None,
-                         form.description.data, form.serial_number.data.strip() if form.serial_number.data else None,
+            # Update DB
+            cur.execute("""UPDATE items
+                           SET name=%s, category=%s, description=%s, serial_number=%s,
+                               manufacturer=%s, model=%s
+                           WHERE inventory_id=%s""",
+                        (form.name.data.strip(),
+                         form.category.data.strip() if form.category.data else None,
+                         form.description.data,
+                         form.serial_number.data.strip() if form.serial_number.data else None,
                          form.manufacturer.data.strip() if form.manufacturer.data else None,
-                         form.model.data.strip() if form.model.data else None, inventory_id))
+                         form.model.data.strip() if form.model.data else None,
+                         inventory_id))
             conn.commit()
-            flash("Item updated.", "success")
+
+            # ✅ Detect changes
+            updated_data = {
+                "name": form.name.data.strip(),
+                "category": form.category.data.strip() if form.category.data else None,
+                "description": form.description.data,
+                "serial_number": form.serial_number.data.strip() if form.serial_number.data else None,
+                "manufacturer": form.manufacturer.data.strip() if form.manufacturer.data else None,
+                "model": form.model.data.strip() if form.model.data else None,
+            }
+            if updated_data != original_data:
+                # ✅ Regenerate QR Code
+                from pathlib import Path
+                qr_dir = Path("static/qr_codes")
+                qr_dir.mkdir(parents=True, exist_ok=True)
+
+                qr_path = qr_dir / f"{inventory_id}.png"
+                logo_path = "static/uploads/company_logo.png"  # Change if needed
+                qr_data_text = f"ID: {inventory_id}\nName: {updated_data['name']}\nSN: {updated_data['serial_number'] or ''}"
+
+                img = generate_qr_with_logo(qr_data_text, logo_path)
+                img.save(qr_path)
+
+            flash("Item updated and QR regenerated.", "success")
             return redirect(url_for("items"))
+
         except mariadb.Error as ex:
             conn.rollback()
             flash(f"Error: {ex}", "danger")
+
     cur.close()
     conn.close()
     return render_template("item_form.html", form=form, mode="edit")
@@ -543,19 +578,25 @@ def productions_remove(pid):
 
 # QR label with logo in center
 def generate_qr_with_logo(data_text, logo_path=None, box_size=10, border=4):
-    qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_H, box_size=box_size, border=border)
+    qr = qrcode.QRCode(
+        error_correction=qrcode.constants.ERROR_CORRECT_H,
+        box_size=box_size,
+        border=border
+    )
     qr.add_data(data_text)
     qr.make(fit=True)
     img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+    
     if logo_path and os.path.exists(logo_path):
         logo = Image.open(logo_path).convert("RGBA")
-        # Scale logo to ~20% of QR size
+        # Scale logo to ~22% of QR size
         qr_w, qr_h = img.size
         logo_size = int(min(qr_w, qr_h) * 0.22)
         logo.thumbnail((logo_size, logo_size), Image.LANCZOS)
         lx = (qr_w - logo.size[0]) // 2
         ly = (qr_h - logo.size[1]) // 2
         img.paste(logo, (lx, ly), logo)
+    
     return img
 
 @app.route("/labels/<inventory_id>.png")
