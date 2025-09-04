@@ -26,6 +26,8 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(APP_DIR, "config.json")
 UPLOAD_DIR = os.path.join(APP_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+QR_DIR = os.path.join(APP_DIR, "static", "qr_codes")
+os.makedirs(QR_DIR, exist_ok=True)
 
 def load_config():
     if not os.path.exists(CONFIG_PATH):
