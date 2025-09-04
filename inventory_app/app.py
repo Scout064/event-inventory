@@ -334,32 +334,29 @@ def items_new():
 def items_edit(inventory_id):
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("""SELECT inventory_id, name, category, description, serial_number, manufacturer, model
-                   FROM items WHERE inventory_id=%s""", (inventory_id,))
+    cur.execute("""SELECT inventory_id,name,category,description,serial_number,
+                   manufacturer,model FROM items WHERE inventory_id=%s""", (inventory_id,))
     row = cur.fetchone()
     if not row:
         cur.close()
         conn.close()
         abort(404)
 
-    # Original data for comparison
-    original_data = {
+    form = ItemForm(data={
+        "inventory_id": row[0],
         "name": row[1],
         "category": row[2],
         "description": row[3],
         "serial_number": row[4],
         "manufacturer": row[5],
         "model": row[6],
-    }
+    })
 
-    form = ItemForm(data=original_data)
     if request.method == "POST" and form.validate_on_submit():
         try:
             # Update DB
-            cur.execute("""UPDATE items
-                           SET name=%s, category=%s, description=%s, serial_number=%s,
-                               manufacturer=%s, model=%s
-                           WHERE inventory_id=%s""",
+            cur.execute("""UPDATE items SET name=%s, category=%s, description=%s, serial_number=%s,
+                           manufacturer=%s, model=%s WHERE inventory_id=%s""",
                         (form.name.data.strip(),
                          form.category.data.strip() if form.category.data else None,
                          form.description.data,
@@ -369,29 +366,27 @@ def items_edit(inventory_id):
                          inventory_id))
             conn.commit()
 
-            # ✅ Detect changes
-            updated_data = {
-                "name": form.name.data.strip(),
-                "category": form.category.data.strip() if form.category.data else None,
-                "description": form.description.data,
-                "serial_number": form.serial_number.data.strip() if form.serial_number.data else None,
-                "manufacturer": form.manufacturer.data.strip() if form.manufacturer.data else None,
-                "model": form.model.data.strip() if form.model.data else None,
-            }
-            if updated_data != original_data:
-                # ✅ Regenerate QR Code
-                from pathlib import Path
-                qr_dir = Path("static/qr_codes")
-                qr_dir.mkdir(parents=True, exist_ok=True)
+            # ✅ Always regenerate QR after update
+            cfg = load_config()
+            logo_path = cfg.get("logo_path")
 
-                qr_path = qr_dir / f"{inventory_id}.png"
-                logo_path = "static/uploads/company_logo.png"  # Change if needed
-                qr_data_text = f"ID: {inventory_id}\nName: {updated_data['name']}\nSN: {updated_data['serial_number'] or ''}"
+            qr_dir = Path("static/qr_codes")
+            qr_dir.mkdir(parents=True, exist_ok=True)
+            qr_path = qr_dir / f"{inventory_id}.png"
 
-                img = generate_qr_with_logo(qr_data_text, logo_path)
-                img.save(qr_path)
+            qr_data_text = (
+                f"ID: {inventory_id}\n"
+                f"Name: {form.name.data.strip()}\n"
+                f"Category: {form.category.data or ''}\n"
+                f"SN: {form.serial_number.data or ''}\n"
+                f"Manufacturer: {form.manufacturer.data or ''}\n"
+                f"Model: {form.model.data or ''}"
+            )
 
-            flash("Item updated and QR regenerated.", "success")
+            img = generate_qr_with_logo(qr_data_text, logo_path)
+            img.save(qr_path)
+
+            flash("Item updated and QR code regenerated.", "success")
             return redirect(url_for("items"))
 
         except mariadb.Error as ex:
