@@ -62,6 +62,8 @@ This will:
 * Create a virtual environment
 * Install all Python dependencies
 
+extract the `inventory_app.zip` to `/var/www/inventory` 
+
 ### 3. Configure Apache2 (Production)
 
 Use the provided `apache-inventory.conf` as a template for your VirtualHost:
@@ -85,12 +87,15 @@ Use the provided `apache-inventory.conf` as a template for your VirtualHost:
 ### 4. Development Mode
 
 ```bash
+cd /var/www/inventory
+python3 -m venv venv
 source venv/bin/activate
-python wsgi.py
+pip install -r requirements.txt
+python app.py
 ```
 
 Access via:
-`http://127.0.0.1:5000/setup` to complete the initial configuration.
+`http://127.0.0.1:8000` / `http://server-ip:8000` to complete the initial configuration.
 
 ---
 
