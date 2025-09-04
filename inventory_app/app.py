@@ -5,7 +5,7 @@ import io
 import re
 from functools import wraps
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, flash, send_file, abort
+from flask import Flask, render_template, request, redirect, url_for, flash, send_file, abort, send_from_directory
 from flask_login import LoginManager, login_user, logout_user, current_user, login_required, UserMixin
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField, BooleanField, TextAreaField, FileField, IntegerField
@@ -599,10 +599,11 @@ def generate_qr_with_logo(data_text, logo_path=None, box_size=10, border=4):
 @app.route("/labels/<inventory_id>.png")
 @login_required
 def label_png(inventory_id):
-# Output PNG
-    qr_path = Path("/var/www/inventory/static/qr_codes") / f"{inventory_id}.png"
-    qr_label = open(qr_path, "rb").read()
-    return send_file( mimetype="image/png", as_attachment=False, download_name=qr_path)
+    filename = f"{inventory_id}.png"
+    file_path = os.path.join(QR_DIR, filename)
+    if not os.path.exists(file_path):
+        abort(404)  # File doesn't exist
+    return send_from_directory(QR_DIR, filename)
 
 # PDF reports
 @app.route("/reports/items.pdf")
