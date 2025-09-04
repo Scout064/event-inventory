@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block content %}
+<h3>Admin Settings</h3>
+<form method="post" enctype="multipart/form-data">
+  <div class="mb-3">
+    <label class="form-label">Upload New Company Logo (PNG/JPEG)</label>
+    <input type="file" name="company_logo" class="form-control">
+  </div>
+  <button class="btn btn-primary">Save</button>
+</form>
+{% if cfg.logo_path %}
+<hr>
+<p>Current logo:</p>
+<img src="/uploads/{{ cfg.logo_path.split('/')[-1] }}" style="max-height:120px">
+{% endif %}
+{% endblock %}

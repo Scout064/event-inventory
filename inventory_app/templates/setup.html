@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block content %}
+<h3>Initial Setup</h3>
+<form method="post" enctype="multipart/form-data">
+  {{ form.hidden_tag() }}
+  <div class="row g-3">
+    <div class="col-md-6">
+      <label class="form-label">DB Host</label>{{ form.db_host(class="form-control") }}
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">DB Port</label>{{ form.db_port(class="form-control") }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">DB Name</label>{{ form.db_name(class="form-control") }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">DB User</label>{{ form.db_user(class="form-control") }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">DB Password</label>{{ form.db_pass(class="form-control") }}
+    </div>
+  </div>
+  <hr>
+  <div class="row g-3">
+    <div class="col-md-6">
+      <label class="form-label">Admin Username</label>{{ form.admin_username(class="form-control") }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Admin Password</label>{{ form.admin_password(class="form-control") }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Default User Username (optional)</label>{{ form.default_user_username(class="form-control") }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Default User Password (optional)</label>{{ form.default_user_password(class="form-control") }}
+    </div>
+  </div>
+  <hr>
+  <div class="mb-3">
+    <label class="form-label">Company Logo (PNG/JPEG)</label>
+    {{ form.company_logo(class="form-control") }}
+  </div>
+  <button class="btn btn-primary">{{ form.submit.label.text }}</button>
+</form>
+{% endblock %}

@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h3>{{ prod[1] }}</h3>
+    <div class="text-muted">Date: {{ prod[2] or '' }}</div>
+  </div>
+  <div>
+    <a class="btn btn-outline-secondary" href="{{ url_for('report_production_pdf', pid=prod[0]) }}">BOM PDF</a>
+    <a class="btn btn-secondary" href="{{ url_for('productions') }}">Back</a>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-md-7">
+    <h5>Assigned Items</h5>
+    <table class="table table-sm table-striped">
+      <thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Serial</th><th></th></tr></thead>
+      <tbody>
+      {% for r in items %}
+        <tr>
+          <td>{{ r[0] }}</td>
+          <td>{{ r[1] }}</td>
+          <td>{{ r[2] or '' }}</td>
+          <td>{{ r[3] or '' }}</td>
+          <td class="text-end">
+            <form action="{{ url_for('productions_remove', pid=prod[0]) }}" method="post" style="display:inline">
+              <input type="hidden" name="inventory_id" value="{{ r[0] }}">
+              <button class="btn btn-sm btn-outline-danger">Remove</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="col-md-5">
+    <h5>Add Item to Production</h5>
+    <form action="{{ url_for('productions_assign', pid=prod[0]) }}" method="post">
+      <div class="input-group">
+        <select name="inventory_id" class="form-select">
+          <option value="">Select item…</option>
+          {% for i in all_items %}
+            <option value="{{ i[0] }}">{{ i[1] }} ({{ i[0] }})</option>
+          {% endfor %}
+        </select>
+        <button class="btn btn-primary">Add</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

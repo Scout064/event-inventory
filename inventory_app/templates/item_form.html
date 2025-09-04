@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block content %}
+<h3>{{ 'New Item' if mode=='new' else 'Edit Item' }}</h3>
+<form method="post">
+  {{ form.hidden_tag() }}
+  <div class="row g-3">
+    <div class="col-md-4">
+      <label class="form-label">Inventory ID</label>
+      {{ form.inventory_id(class="form-control", readonly=(mode=='edit')) }}
+    </div>
+    <div class="col-md-8">
+      <label class="form-label">Name</label>
+      {{ form.name(class="form-control") }}
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Category</label>
+      {{ form.category(class="form-control") }}
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Manufacturer</label>
+      {{ form.manufacturer(class="form-control") }}
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Model</label>
+      {{ form.model(class="form-control") }}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Serial Number</label>
+      {{ form.serial_number(class="form-control") }}
+    </div>
+    <div class="col-md-12">
+      <label class="form-label">Description</label>
+      {{ form.description(class="form-control", rows="4") }}
+    </div>
+  </div>
+  <div class="mt-3">
+    <button class="btn btn-primary">{{ form.submit.label.text }}</button>
+    <a class="btn btn-secondary" href="{{ url_for('items') }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}
