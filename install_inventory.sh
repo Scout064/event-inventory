@@ -19,8 +19,14 @@ systemctl restart apache2
 
 echo "=== Creating application directory and virtual environment ==="
 APP_DIR="/var/www/inventory"
+STATIC_DIR="/var/www/inventory/static"
+QR_DIR="/var/www/inventory/static/qr_codes"
 mkdir -p $APP_DIR
-chown $(whoami):$(whoami) $APP_DIR
+mkdir -p $STATIC_DIR
+mkdir -p $QR_DIR
+chown www-data:ww-data $APP_DIR
+chown www-data:ww-data $STATIC_DIR
+chown www-data:ww-data $QR_DIR
 cd $APP_DIR
 python3 -m venv venv
 source venv/bin/activate
