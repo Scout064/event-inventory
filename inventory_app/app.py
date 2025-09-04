@@ -612,15 +612,15 @@ def label_png(inventory_id):
         font_small = ImageFont.load_default()
     x = qr_size + int(height_px * 0.1)
     y = int(height_px * 0.12)
-    # Use form.data or safe dictionary instead of tuple indexes
-    inventory_id = form.data.get("inventory_id", "")
-    name = form.data.get("name", "")
-    category = form.data.get("category", "")
-    serial = form.data.get("serial_number", "")
-    manufacturer = form.data.get("manufacturer", "")
-    model = form.data.get("model", "")
+    # Safe extraction with length checks
+    inventory_id = row[0] if len(row) > 0 else ''
+    name = row[1] if len(row) > 1 else ''
+    category = row[2] if len(row) > 2 else ''
+    serial = row[4] if len(row) > 4 else ''
+    manufacturer = row[5] if len(row) > 5 else ''
+    model = row[6] if len(row) > 6 else ''
     # Draw text safely
-    # Line 1: Inventory ID (large font)
+    # Line 1: Inventory ID
     draw.text((x, y), str(inventory_id), font=font, fill="black")
     y += int(height_px * 0.14)
     # Line 2: Name + Category
