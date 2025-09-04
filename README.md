@@ -62,7 +62,7 @@ This will:
 * Create a virtual environment
 * Install all Python dependencies
 
-extract the `inventory_app.zip` to `/var/www/inventory` 
+move the contents of `inventory_app` to `/var/www/inventory` 
 
 ### 3. Configure Apache2 (Production)
 
