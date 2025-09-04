@@ -1,0 +1,29 @@
+Proprietary Software License
+Copyright (c) 2025 Mössner – Audio. All rights reserved.
+
+1. GRANT OF LICENSE
+You are granted a non-exclusive, non-transferable, revocable license to use this software (the "Software") in its original form for personal or internal business purposes only.
+
+2. RESTRICTIONS
+You may NOT:
+- Modify, alter, or create derivative works based on the Software.
+- Distribute, sublicense, lease, rent, or sell the Software or any part thereof.
+- Publish the Software or make it available to third parties without prior written consent.
+- Reverse engineer, decompile, or disassemble the Software, except as required by law.
+
+3. OWNERSHIP
+The Software is licensed, not sold. All intellectual property rights in and to the Software remain the property of Mössner – IT und Audio.
+
+4. NO WARRANTY
+The Software is provided "as is" without warranty of any kind, express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, or non-infringement.
+
+5. LIMITATION OF LIABILITY
+In no event shall Mössner – IT und Audio be liable for any damages arising out of the use or inability to use the Software, even if advised of the possibility of such damages.
+
+6. TERMINATION
+This license is effective until terminated. Mössner – IT und Audio may terminate this license at any time if you fail to comply with the terms herein. Upon termination, you must destroy all copies of the Software.
+
+---
+
+For inquiries or commercial licensing, contact:
+info@moessner-audio.de
