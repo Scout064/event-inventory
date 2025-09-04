@@ -368,23 +368,21 @@ def items_edit(inventory_id):
 
             # ✅ Always regenerate QR after update
             cfg = load_config()
-            logo_path = cfg.get("logo_path")
-
-            qr_dir = Path("static/qr_codes")
-            qr_dir.mkdir(parents=True, exist_ok=True)
-            qr_path = qr_dir / f"{inventory_id}.png"
+            logo_path = cfg.get("logo_path") or "uploads/company_logo.png"  # fallback
 
             qr_data_text = (
                 f"ID: {inventory_id}\n"
                 f"Name: {form.name.data.strip()}\n"
-                f"Category: {form.category.data or ''}\n"
-                f"SN: {form.serial_number.data or ''}\n"
-                f"Manufacturer: {form.manufacturer.data or ''}\n"
-                f"Model: {form.model.data or ''}"
+                f"Category: {form.category.data.strip() if form.category.data else ''}\n"
+                f"SN: {form.serial_number.data.strip() if form.serial_number.data else ''}\n"
+                f"Manufacturer: {form.manufacturer.data.strip() if form.manufacturer.data else ''}\n"
+                f"Model: {form.model.data.strip() if form.model.data else ''}"
             )
 
             img = generate_qr_with_logo(qr_data_text, logo_path)
-            img.save(qr_path)
+            qr_path = Path("static/qr_codes") / f"{inventory_id}.png"
+            qr_path.parent.mkdir(parents=True, exist_ok=True)
+            img.save(qr_path))
 
             flash("Item updated and QR code regenerated.", "success")
             return redirect(url_for("items"))
