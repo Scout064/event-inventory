@@ -382,7 +382,7 @@ def items_edit(inventory_id):
             img = generate_qr_with_logo(qr_data_text, logo_path)
             qr_path = Path("static/qr_codes") / f"{inventory_id}.png"
             qr_path.parent.mkdir(parents=True, exist_ok=True)
-            img.save(qr_path))
+            img.save(qr_path)
 
             flash("Item updated and QR code regenerated.", "success")
             return redirect(url_for("items"))
