@@ -121,7 +121,7 @@ lp -d DYMO_LabelWriter_450 label.pdf
 ## 📄 License
 
 This software is **proprietary**.
-See [LICENSE.txt](LICENSE.txt) for details.
+See [LICENSE.txt](license.txt) for details.
 
 ---
 
