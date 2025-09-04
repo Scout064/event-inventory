@@ -389,7 +389,7 @@ def items_edit(inventory_id):
 
             # ✅ Always regenerate QR after update
             cfg = load_config()
-            logo_path = cfg.get("logo_path") or "uploads/company_logo.png"  # fallback
+            logo_path = cfg.get("logo_path") or "/var/www/inventory/uploads/company_logo.png"  # fallback
 
             qr_data_text = (
                 f"ID: {inventory_id}\n"
