@@ -42,7 +42,7 @@ Designed for **event technicians** to manage equipment, productions, and generat
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/inventory-management.git
+git clone https://github.com/Scout064/inventory-management.git
 cd inventory-management
 ```
 
