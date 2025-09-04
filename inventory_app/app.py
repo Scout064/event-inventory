@@ -323,23 +323,6 @@ def items_new():
                          form.manufacturer.data.strip() if form.manufacturer.data else None,
                          form.model.data.strip() if form.model.data else None))
             conn.commit()
-            # ✅ Generate QR after adding Item
-            cfg = load_config()
-            logo_path = cfg.get("logo_path") or "uploads/company_logo.png"  # fallback
-
-            qr_data_text = (
-                f"ID: {inventory_id}\n"
-                f"Name: {form.name.data.strip()}\n"
-                f"Category: {form.category.data.strip() if form.category.data else ''}\n"
-                f"SN: {form.serial_number.data.strip() if form.serial_number.data else ''}\n"
-                f"Manufacturer: {form.manufacturer.data.strip() if form.manufacturer.data else ''}\n"
-                f"Model: {form.model.data.strip() if form.model.data else ''}"
-            )
-
-            img = generate_qr_with_logo(qr_data_text, logo_path)
-            qr_path = Path("/var/www/inventory/static/qr_codes") / f"{inventory_id}.png"
-            qr_path.parent.mkdir(parents=True, exist_ok=True)
-            img.save(qr_path)
             flash("Item created.", "success")
             return redirect(url_for("items"))
         except mariadb.Error as ex:
@@ -387,25 +370,7 @@ def items_edit(inventory_id):
                          inventory_id))
             conn.commit()
 
-            # ✅ Always regenerate QR after update
-            cfg = load_config()
-            logo_path = cfg.get("logo_path") or "/var/www/inventory/uploads/company_logo.png"  # fallback
-
-            qr_data_text = (
-                f"ID: {inventory_id}\n"
-                f"Name: {form.name.data.strip()}\n"
-                f"Category: {form.category.data.strip()}\n"
-                f"SN: {form.serial_number.data.strip()}\n"
-                f"Manufacturer: {form.manufacturer.data.strip()}\n"
-                f"Model: {form.model.data.strip()}"
-            )
-
-            img = generate_qr_with_logo(qr_data_text, logo_path)
-            qr_path = Path("/var/www/inventory/static/qr_codes") / f"{inventory_id}.png"
-            qr_path.parent.mkdir(parents=True, exist_ok=True)
-            img.save(qr_path)
-
-            flash("Item updated and QR code regenerated.", "success")
+            flash("Item updated.", "success")
             return redirect(url_for("items"))
 
         except mariadb.Error as ex:
@@ -616,11 +581,53 @@ def generate_qr_with_logo(data_text, logo_path=None, box_size=10, border=4):
 @app.route("/labels/<inventory_id>.png")
 @login_required
 def label_png(inventory_id):
-    filename = f"{inventory_id}.png"
-    file_path = os.path.join(QR_DIR, filename)
-    if not os.path.exists(file_path):
-        abort(404)  # File doesn't exist
-    return send_from_directory(QR_DIR, filename)
+    # Create a simple label: QR + text lines
+    cfg = load_config()
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT name, manufacturer, model FROM items WHERE inventory_id=%s", (inventory_id,))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    if not row:
+        abort(404)
+    qr = generate_qr_with_logo(inventory_id, cfg.get("logo_path"))
+    # Compose label image (100mm x 54mm at 300dpi ~ 1181 x 637 px)
+    dpi = 300
+    width_px = int((100/25.4)*dpi)
+    height_px = int((54/25.4)*dpi)
+    label = Image.new("RGB", (width_px, height_px), "white")
+    # Paste QR at left
+    qr_size = int(height_px * 0.9)
+    qr = qr.resize((qr_size, qr_size), Image.LANCZOS)
+    label.paste(qr, (int(height_px*0.05), int(height_px*0.05)))
+    # Draw text
+    from PIL import ImageDraw, ImageFont
+    draw = ImageDraw.Draw(label)
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", int(height_px * 0.1))
+        font_small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", int(height_px * 0.08))
+    except:
+        font = ImageFont.load_default()
+        font_small = ImageFont.load_default()
+    x = qr_size + int(height_px * 0.1)
+    y = int(height_px * 0.12)
+    # Line 1: Inventory ID
+    draw.text((x, y), f"{row[0]}", font=font, fill="black")
+    y += int(height_px * 0.14)
+    # Line 2: Name + Category
+    draw.text((x, y), f"{row[1] or ''} ({row[2] or ''})".strip(), font=font_small, fill="black")
+    y += int(height_px * 0.12)
+    # Line 3: Serial Number
+    draw.text((x, y), f"SN: {row[4] or ''}", font=font_small, fill="black")
+    y += int(height_px * 0.12)
+    # Line 4: Manufacturer + Model
+    draw.text((x, y), f"{row[5] or ''} {row[6] or ''}".strip(), font=font_small, fill="black")    
+    # Output PNG
+    bio = io.BytesIO()
+    label.save(bio, format="PNG")
+    bio.seek(0)
+    return send_file(bio, mimetype="image/png", as_attachment=False, download_name=f"{inventory_id}.png")
 
 # PDF reports
 @app.route("/reports/items.pdf")
