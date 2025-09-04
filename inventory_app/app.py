@@ -602,7 +602,7 @@ def label_png(inventory_id):
 # Output PNG
     qr_path = Path("/var/www/inventory/static/qr_codes") / f"{inventory_id}.png"
     qr_label = open(qr_path, "rb").read()
-    return send_file(qr_label, mimetype="image/png", as_attachment=False, download_name=f"{inventory_id}.png")
+    return send_file( mimetype="image/png", as_attachment=False, download_name=qr_path)
 
 # PDF reports
 @app.route("/reports/items.pdf")
