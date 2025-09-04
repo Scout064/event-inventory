@@ -48,7 +48,7 @@ cd inventory-management
 
 ### 2. Run Installation Script
 
-Make sure you are on **Linux** with `apt-get` available.
+Make sure you are on **Linux** with `apt-get` available and run the script as **root** or with **sudo**.
 
 ```bash
 chmod +x install_dependencies.sh
