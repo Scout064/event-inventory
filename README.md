@@ -83,6 +83,14 @@ Use the provided `apache-inventory.conf` as a template for your VirtualHost:
     SSLCertificateKeyFile /etc/ssl/private/your-key.pem
 </VirtualHost>
 ```
+after, enable the Site:
+```
+a2enmod rewrite
+a2enmod ssl
+a2enmod wsgi
+a2ensite apache-inventory.conf
+systemctl reload apache2
+```
 
 ### 4. Development Mode
 
