@@ -601,7 +601,7 @@ def generate_qr_with_logo(data_text, logo_path=None, box_size=10, border=4):
 def label_png(inventory_id):
 # Output PNG
     qr_path = Path("/var/www/inventory/static/qr_codes") / f"{inventory_id}.png"
-    qr_label = return open(qr_path, "rb").read()
+    qr_label = open(qr_path, "rb").read()
     return send_file(qr_label, mimetype="image/png", as_attachment=False, download_name=f"{inventory_id}.png")
 
 # PDF reports
