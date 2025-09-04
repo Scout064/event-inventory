@@ -20,6 +20,8 @@ from reportlab.lib.pagesizes import A4, letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 
+from pathlib import Path
+
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(APP_DIR, "config.json")
 UPLOAD_DIR = os.path.join(APP_DIR, "uploads")
