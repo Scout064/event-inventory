@@ -585,7 +585,10 @@ def label_png(inventory_id):
     cfg = load_config()
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT name, manufacturer, model FROM items WHERE inventory_id=%s", (inventory_id,))
+    cur.execute("""
+    SELECT inventory_id, name, category, serial_number, manufacturer, model
+    FROM items WHERE inventory_id=%s
+    """, (inventory_id,))
     row = cur.fetchone()
     cur.close()
     conn.close()
