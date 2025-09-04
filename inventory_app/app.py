@@ -612,17 +612,29 @@ def label_png(inventory_id):
         font_small = ImageFont.load_default()
     x = qr_size + int(height_px * 0.1)
     y = int(height_px * 0.12)
-    # Line 1: Inventory ID
-    draw.text((x, y), f"{row[0]}", font=font, fill="black")
+    # Use form.data or safe dictionary instead of tuple indexes
+    inventory_id = form.data.get("inventory_id", "")
+    name = form.data.get("name", "")
+    category = form.data.get("category", "")
+    serial = form.data.get("serial_number", "")
+    manufacturer = form.data.get("manufacturer", "")
+    model = form.data.get("model", "")
+    # Draw text safely
+    # Line 1: Inventory ID (large font)
+    draw.text((x, y), str(inventory_id), font=font, fill="black")
     y += int(height_px * 0.14)
     # Line 2: Name + Category
-    draw.text((x, y), f"{row[1] or ''} ({row[2] or ''})".strip(), font=font_small, fill="black")
-    y += int(height_px * 0.12)
+    if name or category:
+        draw.text((x, y), f"{name} ({category})" if category else name, font=font_small, fill="black")
+        y += int(height_px * 0.12)
     # Line 3: Serial Number
-    draw.text((x, y), f"SN: {row[4] or ''}", font=font_small, fill="black")
-    y += int(height_px * 0.12)
+    if serial:
+        draw.text((x, y), f"SN: {serial}", font=font_small, fill="black")
+        y += int(height_px * 0.12)
     # Line 4: Manufacturer + Model
-    draw.text((x, y), f"{row[5] or ''} {row[6] or ''}".strip(), font=font_small, fill="black")    
+    if manufacturer or model:
+        draw.text((x, y), f"{manufacturer} {model}".strip(), font=font_small, fill="black")
+
     # Output PNG
     bio = io.BytesIO()
     label.save(bio, format="PNG")
