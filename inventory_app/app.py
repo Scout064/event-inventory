@@ -585,10 +585,7 @@ def label_png(inventory_id):
     cfg = load_config()
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("""
-    SELECT inventory_id, name, category, serial_number, manufacturer, model
-    FROM items WHERE inventory_id=%s
-    """, (inventory_id,))
+    cur.execute("SELECT inventory_id, name, category, serial_number, manufacturer, model FROM items WHERE inventory_id=%s", (inventory_id,))
     row = cur.fetchone()
     cur.close()
     conn.close()
@@ -615,22 +612,21 @@ def label_png(inventory_id):
         font_small = ImageFont.load_default()
     x = qr_size + int(height_px * 0.1)
     y = int(height_px * 0.12)
-    # Safe extraction with length checks
-    inventory_id = row[0] if len(row) > 0 else ''
+    # Safe extraction
+    inventory_id_val = row[0] if len(row) > 0 else ''
     name = row[1] if len(row) > 1 else ''
     category = row[2] if len(row) > 2 else ''
-    serial = row[4] if len(row) > 4 else ''
-    manufacturer = row[5] if len(row) > 5 else ''
-    model = row[6] if len(row) > 6 else ''
-    # Draw text safely
+    serial = row[3] if len(row) > 3 else ''
+    manufacturer = row[4] if len(row) > 4 else ''
+    model = row[5] if len(row) > 5 else ''
     # Line 1: Inventory ID
-    draw.text((x, y), str(inventory_id), font=font, fill="black")
+    draw.text((x, y), str(inventory_id_val), font=font, fill="black")
     y += int(height_px * 0.14)
     # Line 2: Name + Category
     if name or category:
         draw.text((x, y), f"{name} ({category})" if category else name, font=font_small, fill="black")
         y += int(height_px * 0.12)
-    # Line 3: Serial Number
+        # Line 3: Serial Number
     if serial:
         draw.text((x, y), f"SN: {serial}", font=font_small, fill="black")
         y += int(height_px * 0.12)
