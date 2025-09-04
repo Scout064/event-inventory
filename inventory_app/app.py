@@ -599,47 +599,10 @@ def generate_qr_with_logo(data_text, logo_path=None, box_size=10, border=4):
 @app.route("/labels/<inventory_id>.png")
 @login_required
 def label_png(inventory_id):
-    # Create a simple label: QR + text lines
-    cfg = load_config()
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT name, manufacturer, model FROM items WHERE inventory_id=%s", (inventory_id,))
-    row = cur.fetchone()
-    cur.close()
-    conn.close()
-    if not row:
-        abort(404)
-    qr = generate_qr_with_logo(inventory_id, cfg.get("logo_path"))
-    # Compose label image (100mm x 54mm at 300dpi ~ 1181 x 637 px)
-    dpi = 300
-    width_px = int((100/25.4)*dpi)
-    height_px = int((54/25.4)*dpi)
-    label = Image.new("RGB", (width_px, height_px), "white")
-    # Paste QR at left
-    qr_size = int(height_px * 0.9)
-    qr = qr.resize((qr_size, qr_size), Image.LANCZOS)
-    label.paste(qr, (int(height_px*0.05), int(height_px*0.05)))
-    # Draw text
-    from PIL import ImageDraw, ImageFont
-    draw = ImageDraw.Draw(label)
-    try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", int(height_px*0.1))
-        font_small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", int(height_px*0.08))
-    except:
-        font = ImageFont.load_default()
-        font_small = ImageFont.load_default()
-    x = qr_size + int(height_px*0.1)
-    y = int(height_px*0.12)
-    draw.text((x, y), f"{inventory_id}", font=font, fill="black")
-    y += int(height_px*0.16)
-    draw.text((x, y), f"{row[0]}", font=font_small, fill="black")
-    y += int(height_px*0.12)
-    draw.text((x, y), f"{row[1] or ''} {row[2] or ''}".strip(), font=font_small, fill="black")
-    # Output PNG
-    bio = io.BytesIO()
-    label.save(bio, format="PNG")
-    bio.seek(0)
-    return send_file(bio, mimetype="image/png", as_attachment=False, download_name=f"{inventory_id}.png")
+# Output PNG
+    qr_path = Path("/var/www/inventory/static/qr_codes") / f"{inventory_id}.png"
+    qr_label = return open(qr_path, "rb").read()
+    return send_file(qr_label, mimetype="image/png", as_attachment=False, download_name=f"{inventory_id}.png")
 
 # PDF reports
 @app.route("/reports/items.pdf")
