@@ -42,8 +42,8 @@ Designed for **event technicians** to manage equipment, productions, and generat
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/Scout064/inventory-management.git
-cd inventory-management
+git clone https://github.com/Scout064/event-inventory.git
+cd event-inventory
 ```
 
 ### 2. Run Installation Script
@@ -51,8 +51,8 @@ cd inventory-management
 Make sure you are on **Linux** with `apt-get` available and run the script as **root** or with **sudo**.
 
 ```bash
-chmod +x install_dependencies.sh
-./install_dependencies.sh
+chmod +x install_inventory.sh
+./install_inventory.sh
 ```
 
 This will:
