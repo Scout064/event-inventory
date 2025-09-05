@@ -581,7 +581,6 @@ def generate_qr_with_logo(data_text, logo_path=None, box_size=10, border=4):
 @app.route("/labels/<inventory_id>.png")
 @login_required
 def label_png(inventory_id):
-    # Create a simple label: QR + text lines
     cfg = load_config()
     conn = get_db()
     cur = conn.cursor()
@@ -591,16 +590,24 @@ def label_png(inventory_id):
     conn.close()
     if not row:
         abort(404)
-    qr = generate_qr_with_logo(inventory_id, cfg.get("logo_path"))
-    # Compose label image (100mm x 54mm at 300dpi ~ 1181 x 637 px)
+
+    # Unpack and replace None with empty strings
+    inventory_id_val, name, category, serial, manufacturer, model = (str(v or '') for v in row)
+
+    # Generate QR
+    qr = generate_qr_with_logo(inventory_id_val, cfg.get("logo_path"))
+
+    # Create label image (100mm x 54mm at 300dpi)
     dpi = 300
-    width_px = int((100/25.4)*dpi)
-    height_px = int((54/25.4)*dpi)
+    width_px = int((100 / 25.4) * dpi)
+    height_px = int((54 / 25.4) * dpi)
     label = Image.new("RGB", (width_px, height_px), "white")
-    # Paste QR at left
+
+    # Paste QR on the left
     qr_size = int(height_px * 0.9)
     qr = qr.resize((qr_size, qr_size), Image.LANCZOS)
-    label.paste(qr, (int(height_px*0.05), int(height_px*0.05)))
+    label.paste(qr, (int(height_px * 0.05), int(height_px * 0.05)))
+
     # Draw text
     from PIL import ImageDraw, ImageFont
     draw = ImageDraw.Draw(label)
@@ -610,29 +617,35 @@ def label_png(inventory_id):
     except:
         font = ImageFont.load_default()
         font_small = ImageFont.load_default()
+
     x = qr_size + int(height_px * 0.1)
     y = int(height_px * 0.12)
-    # Safe extraction
-    inventory_id_val = row[0] if len(row) > 0 else ''
-    name = row[1] if len(row) > 1 else ''
-    category = row[2] if len(row) > 2 else ''
-    serial = row[3] if len(row) > 3 else ''
-    manufacturer = row[4] if len(row) > 4 else ''
-    model = row[5] if len(row) > 5 else ''
+
     # Line 1: Inventory ID
-    draw.text((x, y), str(inventory_id_val), font=font, fill="black")
+    draw.text((x, y), inventory_id_val, font=font, fill="black")
     y += int(height_px * 0.14)
+
     # Line 2: Name + Category
     if name or category:
-        draw.text((x, y), f"{name} ({category})" if category else name, font=font_small, fill="black")
+        text_line = f"{name} ({category})" if category else name
+        draw.text((x, y), text_line.strip(), font=font_small, fill="black")
         y += int(height_px * 0.12)
-        # Line 3: Serial Number
+
+    # Line 3: Serial Number
     if serial:
         draw.text((x, y), f"SN: {serial}", font=font_small, fill="black")
         y += int(height_px * 0.12)
+
     # Line 4: Manufacturer + Model
     if manufacturer or model:
         draw.text((x, y), f"{manufacturer} {model}".strip(), font=font_small, fill="black")
+
+    # Output PNG
+    bio = io.BytesIO()
+    label.save(bio, format="PNG")
+    bio.seek(0)
+    return send_file(bio, mimetype="image/png", as_attachment=False, download_name=f"{inventory_id_val}.png")
+
 
     # Output PNG
     bio = io.BytesIO()
