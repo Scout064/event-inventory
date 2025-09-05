@@ -5,7 +5,7 @@ import io
 import re
 from functools import wraps
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, flash, send_file, abort
+from flask import Flask, render_template, request, redirect, url_for, flash, send_file, abort, send_from_directory
 from flask_login import LoginManager, login_user, logout_user, current_user, login_required, UserMixin
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField, BooleanField, TextAreaField, FileField, IntegerField
@@ -370,25 +370,7 @@ def items_edit(inventory_id):
                          inventory_id))
             conn.commit()
 
-            # ✅ Always regenerate QR after update
-            cfg = load_config()
-            logo_path = cfg.get("logo_path") or "uploads/company_logo.png"  # fallback
-
-            qr_data_text = (
-                f"ID: {inventory_id}\n"
-                f"Name: {form.name.data.strip()}\n"
-                f"Category: {form.category.data.strip() if form.category.data else ''}\n"
-                f"SN: {form.serial_number.data.strip() if form.serial_number.data else ''}\n"
-                f"Manufacturer: {form.manufacturer.data.strip() if form.manufacturer.data else ''}\n"
-                f"Model: {form.model.data.strip() if form.model.data else ''}"
-            )
-
-            img = generate_qr_with_logo(qr_data_text, logo_path)
-            qr_path = Path("/var/www/inventory/static/qr_codes") / f"{inventory_id}.png"
-            qr_path.parent.mkdir(parents=True, exist_ok=True)
-            img.save(qr_path)
-
-            flash("Item updated and QR code regenerated.", "success")
+            flash("Item updated.", "success")
             return redirect(url_for("items"))
 
         except mariadb.Error as ex:
@@ -599,42 +581,72 @@ def generate_qr_with_logo(data_text, logo_path=None, box_size=10, border=4):
 @app.route("/labels/<inventory_id>.png")
 @login_required
 def label_png(inventory_id):
-    # Create a simple label: QR + text lines
     cfg = load_config()
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT name, manufacturer, model FROM items WHERE inventory_id=%s", (inventory_id,))
+    cur.execute("SELECT inventory_id, name, category, serial_number, manufacturer, model FROM items WHERE inventory_id=%s", (inventory_id,))
     row = cur.fetchone()
     cur.close()
     conn.close()
     if not row:
         abort(404)
-    qr = generate_qr_with_logo(inventory_id, cfg.get("logo_path"))
-    # Compose label image (100mm x 54mm at 300dpi ~ 1181 x 637 px)
+
+    # Unpack and replace None with empty strings
+    inventory_id_val, name, category, serial, manufacturer, model = (str(v or '') for v in row)
+
+    # Generate QR
+    qr = generate_qr_with_logo(inventory_id_val, cfg.get("logo_path"))
+
+    # Create label image (100mm x 54mm at 300dpi)
     dpi = 300
-    width_px = int((100/25.4)*dpi)
-    height_px = int((54/25.4)*dpi)
+    width_px = int((100 / 25.4) * dpi)
+    height_px = int((54 / 25.4) * dpi)
     label = Image.new("RGB", (width_px, height_px), "white")
-    # Paste QR at left
+
+    # Paste QR on the left
     qr_size = int(height_px * 0.9)
     qr = qr.resize((qr_size, qr_size), Image.LANCZOS)
-    label.paste(qr, (int(height_px*0.05), int(height_px*0.05)))
+    label.paste(qr, (int(height_px * 0.05), int(height_px * 0.05)))
+
     # Draw text
     from PIL import ImageDraw, ImageFont
     draw = ImageDraw.Draw(label)
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", int(height_px*0.1))
-        font_small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", int(height_px*0.08))
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", int(height_px * 0.1))
+        font_small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", int(height_px * 0.08))
     except:
         font = ImageFont.load_default()
         font_small = ImageFont.load_default()
-    x = qr_size + int(height_px*0.1)
-    y = int(height_px*0.12)
-    draw.text((x, y), f"{inventory_id}", font=font, fill="black")
-    y += int(height_px*0.16)
-    draw.text((x, y), f"{row[0]}", font=font_small, fill="black")
-    y += int(height_px*0.12)
-    draw.text((x, y), f"{row[1] or ''} {row[2] or ''}".strip(), font=font_small, fill="black")
+
+    x = qr_size + int(height_px * 0.1)
+    y = int(height_px * 0.12)
+
+    # Line 1: Inventory ID
+    draw.text((x, y), inventory_id_val, font=font, fill="black")
+    y += int(height_px * 0.14)
+
+    # Line 2: Name + Category
+    if name or category:
+        text_line = f"{name} ({category})" if category else name
+        draw.text((x, y), text_line.strip(), font=font_small, fill="black")
+        y += int(height_px * 0.12)
+
+    # Line 3: Serial Number
+    if serial:
+        draw.text((x, y), f"SN: {serial}", font=font_small, fill="black")
+        y += int(height_px * 0.12)
+
+    # Line 4: Manufacturer + Model
+    if manufacturer or model:
+        draw.text((x, y), f"{manufacturer} {model}".strip(), font=font_small, fill="black")
+
+    # Output PNG
+    bio = io.BytesIO()
+    label.save(bio, format="PNG")
+    bio.seek(0)
+    return send_file(bio, mimetype="image/png", as_attachment=False, download_name=f"{inventory_id_val}.png")
+
+
     # Output PNG
     bio = io.BytesIO()
     label.save(bio, format="PNG")
