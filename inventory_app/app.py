@@ -584,14 +584,18 @@ def label_png(inventory_id):
     cfg = load_config()
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT inventory_id, name, category, serial_number, manufacturer, model FROM items WHERE inventory_id=%s", (inventory_id,))
+    cur.execute("""
+        SELECT inventory_id, name, category, serial_number, manufacturer, model
+        FROM items
+        WHERE inventory_id=%s
+    """, (inventory_id,))
     row = cur.fetchone()
     cur.close()
     conn.close()
     if not row:
         abort(404)
 
-    # Unpack and replace None with empty strings
+    # Unpack values and replace None with empty strings
     inventory_id_val, name, category, serial, manufacturer, model = (str(v or '') for v in row)
 
     # Generate QR
@@ -608,50 +612,58 @@ def label_png(inventory_id):
     qr = qr.resize((qr_size, qr_size), Image.LANCZOS)
     label.paste(qr, (int(height_px * 0.05), int(height_px * 0.05)))
 
-    # Draw text
     from PIL import ImageDraw, ImageFont
     draw = ImageDraw.Draw(label)
-    try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", int(height_px * 0.1))
-        font_small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", int(height_px * 0.08))
-    except:
-        font = ImageFont.load_default()
-        font_small = ImageFont.load_default()
+    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 
-    x = qr_size + int(height_px * 0.1)
-    y = int(height_px * 0.12)
-
-    # Line 1: Inventory ID
-    draw.text((x, y), inventory_id_val, font=font, fill="black")
-    y += int(height_px * 0.14)
-
-    # Line 2: Name + Category
+    # Prepare text lines
+    lines = []
+    if inventory_id_val:
+        lines.append(inventory_id_val)
     if name or category:
-        text_line = f"{name} ({category})" if category else name
-        draw.text((x, y), text_line.strip(), font=font_small, fill="black")
-        y += int(height_px * 0.12)
-
-    # Line 3: Serial Number
+        lines.append(f"{name} ({category})" if category else name)
     if serial:
-        draw.text((x, y), f"SN: {serial}", font=font_small, fill="black")
-        y += int(height_px * 0.12)
-
-    # Line 4: Manufacturer + Model
+        lines.append(f"SN: {serial}")
     if manufacturer or model:
-        draw.text((x, y), f"{manufacturer} {model}".strip(), font=font_small, fill="black")
+        lines.append(f"{manufacturer} {model}".strip())
+
+    # Text area
+    x = qr_size + int(height_px * 0.1)
+    y_start = int(height_px * 0.12)
+    max_text_width = width_px - x - int(height_px * 0.05)
+    max_text_height = height_px - y_start - int(height_px * 0.05)
+
+    # Initial sizes
+    base_font_size = int(height_px * 0.08)
+    min_font_size = 10
+    line_spacing_ratio = 0.14  # relative to height_px
+
+    # Function to compute block height for given font size
+    def compute_block_height(font_size):
+        return len(lines) * font_size + (len(lines) - 1) * int(font_size * 0.5)
+
+    # Scale font size down if block is too tall
+    font_size = base_font_size
+    while compute_block_height(font_size) > max_text_height and font_size > min_font_size:
+        font_size -= 1
+
+    # Now draw each line, adjusting horizontally too
+    y = y_start
+    for idx, text in enumerate(lines):
+        size = font_size
+        font = ImageFont.truetype(font_path, size)
+        # Shrink font horizontally if too wide
+        while draw.textlength(text, font=font) > max_text_width and size > min_font_size:
+            size -= 1
+            font = ImageFont.truetype(font_path, size)
+        draw.text((x, y), text, font=font, fill="black")
+        y += size + int(size * 0.5)
 
     # Output PNG
     bio = io.BytesIO()
     label.save(bio, format="PNG")
     bio.seek(0)
     return send_file(bio, mimetype="image/png", as_attachment=False, download_name=f"{inventory_id_val}.png")
-
-
-    # Output PNG
-    bio = io.BytesIO()
-    label.save(bio, format="PNG")
-    bio.seek(0)
-    return send_file(bio, mimetype="image/png", as_attachment=False, download_name=f"{inventory_id}.png")
 
 # PDF reports
 @app.route("/reports/items.pdf")
