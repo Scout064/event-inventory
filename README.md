@@ -11,7 +11,6 @@ Designed for **event technicians** to manage equipment, productions, and generat
 ## ✅ Features
 
 * Initial **setup wizard** (database, admin account, company logo)
-* **HTTPS enforced** (except for local LAN access)
 * **Admin & User login** system
 * Manage:
 
