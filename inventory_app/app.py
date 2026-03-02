@@ -325,6 +325,7 @@ def setup():
         return redirect(url_for("login"))
     return render_template("setup.html", form=form, configured=False)
 
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     cfg = load_config()
@@ -339,16 +340,19 @@ def login():
         flash("Invalid credentials", "danger")
     return render_template("login.html", form=form)
 
+
 @app.route("/logout")
 @login_required
 def logout():
     logout_user()
     return redirect(url_for("login"))
 
+
 @app.route("/")
 @login_required
 def index():
     return render_template("index.html")
+
 
 # Items
 @app.route("/items")
@@ -362,7 +366,8 @@ def items():
     conn.close()
     return render_template("items.html", rows=rows)
 
-@app.route("/items/new", methods=["GET","POST"])
+
+@app.route("/items/new", methods=["GET", "POST"])
 @login_required
 def items_new():
     form = ItemForm()
@@ -372,7 +377,8 @@ def items_new():
         try:
             cur.execute("""INSERT INTO items (inventory_id,name,category,description,serial_number,manufacturer,model)
                            VALUES (%s,%s,%s,%s,%s,%s,%s)""",
-                        (form.inventory_id.data.strip(), form.name.data.strip(), form.category.data.strip() if form.category.data else None,
+                        (form.inventory_id.data.strip(), form.name.data.strip(),
+                         form.category.data.strip() if form.category.data else None,
                          form.description.data, form.serial_number.data.strip() if form.serial_number.data else None,
                          form.manufacturer.data.strip() if form.manufacturer.data else None,
                          form.model.data.strip() if form.model.data else None))
@@ -386,6 +392,7 @@ def items_new():
             cur.close()
             conn.close()
     return render_template("item_form.html", form=form, mode="new")
+
 
 @app.route("/items/<inventory_id>/edit", methods=["GET", "POST"])
 @login_required
@@ -435,6 +442,7 @@ def items_edit(inventory_id):
     conn.close()
     return render_template("item_form.html", form=form, mode="edit")
 
+
 @app.route("/items/<inventory_id>/delete", methods=["POST"])
 @login_required
 def items_delete(inventory_id):
@@ -452,6 +460,7 @@ def items_delete(inventory_id):
         conn.close()
     return redirect(url_for("items"))
 
+
 # Productions
 @app.route("/productions")
 @login_required
@@ -464,7 +473,8 @@ def productions():
     conn.close()
     return render_template("productions.html", rows=rows)
 
-@app.route("/productions/new", methods=["GET","POST"])
+
+@app.route("/productions/new", methods=["GET", "POST"])
 @login_required
 def productions_new():
     form = ProductionForm()
@@ -492,7 +502,8 @@ def productions_new():
             conn.close()
     return render_template("production_form.html", form=form, mode="new")
 
-@app.route("/productions/<int:pid>/edit", methods=["GET","POST"])
+
+@app.route("/productions/<int:pid>/edit", methods=["GET", "POST"])
 @login_required
 def productions_edit(pid):
     conn = get_db()
@@ -529,6 +540,7 @@ def productions_edit(pid):
     conn.close()
     return render_template("production_form.html", form=form, mode="edit")
 
+
 @app.route("/productions/<int:pid>/delete", methods=["POST"])
 @login_required
 def productions_delete(pid):
@@ -545,6 +557,7 @@ def productions_delete(pid):
         cur.close()
         conn.close()
     return redirect(url_for("productions"))
+
 
 @app.route("/productions/<int:pid>")
 @login_required
@@ -570,6 +583,7 @@ def productions_view(pid):
     conn.close()
     return render_template("production_view.html", prod=prod, items=items, all_items=all_items)
 
+
 @app.route("/productions/<int:pid>/assign", methods=["POST"])
 @login_required
 def productions_assign(pid):
@@ -580,7 +594,8 @@ def productions_assign(pid):
     conn = get_db()
     cur = conn.cursor()
     try:
-        cur.execute("INSERT IGNORE INTO production_items (production_id, inventory_id) VALUES (%s,%s)", (pid, inventory_id))
+        cur.execute("INSERT IGNORE INTO production_items (production_id, inventory_id) VALUES (%s,%s)",
+                    (pid, inventory_id))
         conn.commit()
         flash("Item assigned.", "success")
     except mariadb.Error as ex:
@@ -590,6 +605,7 @@ def productions_assign(pid):
         cur.close()
         conn.close()
     return redirect(url_for("productions_view", pid=pid))
+
 
 @app.route("/productions/<int:pid>/remove", methods=["POST"])
 @login_required
@@ -609,6 +625,7 @@ def productions_remove(pid):
         conn.close()
     return redirect(url_for("productions_view", pid=pid))
 
+
 # QR label with logo in center
 def generate_qr_with_logo(data_text, logo_path=None, box_size=10, border=4):
     qr = qrcode.QRCode(
@@ -619,7 +636,7 @@ def generate_qr_with_logo(data_text, logo_path=None, box_size=10, border=4):
     qr.add_data(data_text)
     qr.make(fit=True)
     img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
-    
+
     if logo_path and os.path.exists(logo_path):
         logo = Image.open(logo_path).convert("RGBA")
         # Scale logo to ~22% of QR size
@@ -629,8 +646,9 @@ def generate_qr_with_logo(data_text, logo_path=None, box_size=10, border=4):
         lx = (qr_w - logo.size[0]) // 2
         ly = (qr_h - logo.size[1]) // 2
         img.paste(logo, (lx, ly), logo)
-    
+
     return img
+
 
 @app.route("/labels/<inventory_id>.png")
 @login_required
@@ -666,7 +684,6 @@ def label_png(inventory_id):
     qr = qr.resize((qr_size, qr_size), Image.LANCZOS)
     label.paste(qr, (int(height_px * 0.05), int(height_px * 0.05)))
 
-    from PIL import ImageDraw, ImageFont
     draw = ImageDraw.Draw(label)
     font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 
@@ -690,11 +707,10 @@ def label_png(inventory_id):
     # Initial sizes
     base_font_size = int(height_px * 0.08)
     min_font_size = 10
-    line_spacing_ratio = 0.14  # relative to height_px
 
     # Function to compute block height for given font size
-    def compute_block_height(font_size):
-        return len(lines) * font_size + (len(lines) - 1) * int(font_size * 0.5)
+    def compute_block_height(f_size):
+        return len(lines) * f_size + (len(lines) - 1) * int(f_size * 0.5)
 
     # Scale font size down if block is too tall
     font_size = base_font_size
@@ -719,6 +735,7 @@ def label_png(inventory_id):
     bio.seek(0)
     return send_file(bio, mimetype="image/png", as_attachment=False, download_name=f"{inventory_id_val}.png")
 
+
 # PDF reports
 @app.route("/reports/items.pdf")
 @login_required
@@ -734,23 +751,24 @@ def report_items_pdf():
     bio = io.BytesIO()
     c = canvas.Canvas(bio, pagesize=A4)
     width, height = A4
-    y = height - 20*mm
+    y = height - 20 * mm
     c.setFont("Helvetica-Bold", 14)
-    c.drawString(20*mm, y, "Item Inventory Report")
-    y -= 10*mm
+    c.drawString(20 * mm, y, "Item Inventory Report")
+    y -= 10 * mm
     c.setFont("Helvetica", 10)
     for r in rows:
         line = f"{r[0]} | {r[1]} | {r[2] or ''} | SN:{r[3] or ''} | {r[4] or ''} {r[5] or ''}"
-        if y < 20*mm:
+        if y < 20 * mm:
             c.showPage()
-            y = height - 20*mm
+            y = height - 20 * mm
             c.setFont("Helvetica", 10)
-        c.drawString(15*mm, y, line[:120])
-        y -= 6*mm
+        c.drawString(15 * mm, y, line[:120])
+        y -= 6 * mm
     c.showPage()
     c.save()
     bio.seek(0)
     return send_file(bio, mimetype="application/pdf", as_attachment=True, download_name="items_report.pdf")
+
 
 @app.route("/reports/production/<int:pid>.pdf")
 @login_required
@@ -775,32 +793,33 @@ def report_production_pdf(pid):
     bio = io.BytesIO()
     c = canvas.Canvas(bio, pagesize=A4)
     width, height = A4
-    y = height - 20*mm
+    y = height - 20 * mm
     c.setFont("Helvetica-Bold", 14)
-    c.drawString(20*mm, y, f"BOM – {prod[1]}")
-    y -= 8*mm
+    c.drawString(20 * mm, y, f"BOM – {prod[1]}")
+    y -= 8 * mm
     c.setFont("Helvetica", 10)
-    c.drawString(20*mm, y, f"Date: {prod[2] or ''}")
-    y -= 6*mm
+    c.drawString(20 * mm, y, f"Date: {prod[2] or ''}")
+    y -= 6 * mm
     if prod[3]:
-        c.drawString(20*mm, y, f"Notes: {prod[3][:90]}")
-        y -= 8*mm
+        c.drawString(20 * mm, y, f"Notes: {prod[3][:90]}")
+        y -= 8 * mm
     c.setFont("Helvetica", 10)
     for r in items:
-        if y < 20*mm:
+        if y < 20 * mm:
             c.showPage()
-            y = height - 20*mm
+            y = height - 20 * mm
             c.setFont("Helvetica", 10)
         line = f"{r[0]} | {r[1]} | {r[2] or ''} | SN:{r[3] or ''} | {r[4] or ''} {r[5] or ''}"
-        c.drawString(15*mm, y, line[:120])
-        y -= 6*mm
+        c.drawString(15 * mm, y, line[:120])
+        y -= 6 * mm
     c.showPage()
     c.save()
     bio.seek(0)
     return send_file(bio, mimetype="application/pdf", as_attachment=True, download_name=f"production_{pid}_BOM.pdf")
 
+
 # Admin-only simple settings (logo update)
-@app.route("/admin/settings", methods=["GET","POST"])
+@app.route("/admin/settings", methods=["GET", "POST"])
 @login_required
 @admin_required
 def admin_settings():
@@ -819,6 +838,7 @@ def admin_settings():
             save_config(cfg)
             flash("Logo updated.", "success")
     return render_template("admin_settings.html", cfg=cfg)
+
 
 # Optional static serving
 @app.route('/uploads/<path:filename>')
