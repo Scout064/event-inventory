@@ -1,16 +1,25 @@
 {% extends 'base.html' %}
 {% block content %}
 <h3>Admin Settings</h3>
-<form method="post" enctype="multipart/form-data">
-  <div class="mb-3">
-    <label class="form-label">Upload New Company Logo (PNG/JPEG)</label>
-    <input type="file" name="company_logo" class="form-control">
-  </div>
-  <button class="btn btn-primary">Save</button>
-</form>
+<div class="card p-4">
+    <form method="post" enctype="multipart/form-data">
+      <div class="mb-3">
+        <label class="form-label">Site Name</label>
+        <input type="text" name="site_name" class="form-control" 
+               value="{{ cfg.site_name or 'Inventory' }}" placeholder="Enter site name">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Update Company Logo (PNG/JPEG)</label>
+        <input type="file" name="company_logo" class="form-control">
+      </div>     
+      <button class="btn btn-primary">Save Branding</button>
+    </form>
+</div>
 {% if cfg.logo_path %}
 <hr>
-<p>Current logo:</p>
-<img src="/uploads/{{ cfg.logo_path.split('/')[-1] }}" style="max-height:120px">
+<p class="text-muted">Current logo preview:</p>
+<div class="border d-inline-block p-2">
+    <img src="/uploads/{{ cfg.logo_path.split('/')[-1] }}" style="max-height:120px">
+</div>
 {% endif %}
 {% endblock %}
