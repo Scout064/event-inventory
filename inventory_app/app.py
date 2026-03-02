@@ -119,20 +119,14 @@ def enforce_https():
     cfg = load_config()
     if not cfg.get("configured"):
         return
-
     forwarded_proto = request.headers.get("X-Forwarded-Proto", "").lower()
     is_secure = request.is_secure or forwarded_proto == "https"
     remote_ip = request.remote_addr or ""
-
     if not is_secure and not LAN_REGEX.match(remote_ip):
-        trusted_host = cfg.get("app_domain")
-        if trusted_host:
-            path = request.full_path
-            secure_url = f"https://{trusted_host}{path}"
-            return redirect(secure_url, code=301)
-        else:
-            secure_url = f"https://{request.host}{request.full_path}"
-            return redirect(secure_url, code=301)
+        domain = cfg.get("app_domain", request.host)
+        path = request.full_path
+        secure_url = f"https://{domain}{path}"
+        return redirect(secure_url, code=301)
 
 
 class User(UserMixin):
@@ -182,6 +176,11 @@ def load_user(user_id):
 
 
 class SetupForm(FlaskForm):
+    app_domain = StringField(
+        "App Domain (e.g., inventory.example.com)", 
+        validators=[DataRequired()], 
+        default="localhost:8000"
+    )
     db_host = StringField("DB Host", validators=[DataRequired()], default="localhost")
     db_port = StringField("DB Port", validators=[DataRequired()], default="3306")
     db_name = StringField(
@@ -294,6 +293,7 @@ def setup():
 
         new_cfg = {
             "configured": True,
+            "app_domain": form.app_domain.data.strip(),
             "db_host": form.db_host.data.strip(),
             "db_port": form.db_port.data.strip(),
             "db_name": form.db_name.data.strip(),
