@@ -1,23 +1,31 @@
-\
 import os
 import json
-import io
 import re
 from functools import wraps
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, flash, send_file, abort, send_from_directory
-from flask_login import LoginManager, login_user, logout_user, current_user, login_required, UserMixin
+import mariadb
+import qrcode
+from PIL import Image, ImageDraw, ImageFont
+from flask import (
+    Flask, render_template, request, redirect, url_for, flash,
+    send_file, abort, send_from_directory
+)
+from flask_login import (
+    LoginManager, login_user, logout_user,
+    current_user, login_required, UserMixin
+)
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, SubmitField, BooleanField, TextAreaField, FileField
+from wtforms import (
+    StringField, PasswordField, SubmitField, BooleanField,
+    TextAreaField, FileField
+)
 from wtforms.validators import DataRequired, Length, Optional
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-import mariadb
-import qrcode
-from PIL import Image
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
+
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(APP_DIR, "config.json")
@@ -26,15 +34,18 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 QR_DIR = os.path.join(APP_DIR, "static", "qr_codes")
 os.makedirs(QR_DIR, exist_ok=True)
 
+
 def load_config():
     if not os.path.exists(CONFIG_PATH):
         return {"configured": False}
     with open(CONFIG_PATH, "r") as f:
         return json.load(f)
 
+
 def save_config(cfg):
     with open(CONFIG_PATH, "w") as f:
         json.dump(cfg, f, indent=2)
+
 
 def get_db():
     cfg = load_config()
@@ -49,10 +60,10 @@ def get_db():
     )
     return conn
 
+
 def init_db():
     conn = get_db()
     cur = conn.cursor()
-    # Users: id, username unique, password hash, is_admin
     cur.execute("""CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
         username VARCHAR(128) UNIQUE NOT NULL,
@@ -60,7 +71,6 @@ def init_db():
         is_admin BOOLEAN NOT NULL DEFAULT 0
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;""")
 
-    # Items
     cur.execute("""CREATE TABLE IF NOT EXISTS items (
         inventory_id VARCHAR(64) PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
@@ -71,7 +81,6 @@ def init_db():
         model VARCHAR(128)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;""")
 
-    # Productions (Locations / Events)
     cur.execute("""CREATE TABLE IF NOT EXISTS productions (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
@@ -79,7 +88,6 @@ def init_db():
         notes TEXT
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;""")
 
-    # Assignment: items in productions
     cur.execute("""CREATE TABLE IF NOT EXISTS production_items (
         production_id INT NOT NULL,
         inventory_id VARCHAR(64) NOT NULL,
@@ -92,33 +100,32 @@ def init_db():
     cur.close()
     conn.close()
 
-# Flask app
+
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-change-me")
 
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
 
-# HTTPS enforcement except LAN
-LAN_REGEX = re.compile(r"^(127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+)$")
+LAN_REGEX = re.compile(
+    r"^(127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|"
+    r"172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+)$"
+)
+
 
 @app.before_request
 def enforce_https():
     cfg = load_config()
-    # If app not configured yet, allow setup over HTTP
     if not cfg.get("configured"):
         return
-    # Determine if request is secure (behind Apache it's usually handled already).
-    # Respect X-Forwarded-Proto if present.
     forwarded_proto = request.headers.get("X-Forwarded-Proto", "").lower()
     is_secure = request.is_secure or forwarded_proto == "https"
     remote_ip = request.remote_addr or ""
     if not is_secure and not LAN_REGEX.match(remote_ip):
-        # Redirect to HTTPS
         url = request.url.replace("http://", "https://", 1)
         return redirect(url, code=301)
 
-# User model bridging Flask-Login and DB
+
 class User(UserMixin):
     def __init__(self, id, username, password_hash, is_admin):
         self.id = str(id)
@@ -126,10 +133,14 @@ class User(UserMixin):
         self.password_hash = password_hash
         self.is_admin = bool(is_admin)
 
+
 def find_user_by_username(username):
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT id, username, password_hash, is_admin FROM users WHERE username=%s", (username,))
+    cur.execute(
+        "SELECT id, username, password_hash, is_admin FROM users WHERE username=%s",
+        (username,),
+    )
     row = cur.fetchone()
     cur.close()
     conn.close()
@@ -137,16 +148,21 @@ def find_user_by_username(username):
         return User(*row)
     return None
 
+
 def find_user_by_id(user_id):
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT id, username, password_hash, is_admin FROM users WHERE id=%s", (user_id,))
+    cur.execute(
+        "SELECT id, username, password_hash, is_admin FROM users WHERE id=%s",
+        (user_id,),
+    )
     row = cur.fetchone()
     cur.close()
     conn.close()
     if row:
         return User(*row)
     return None
+
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -155,25 +171,37 @@ def load_user(user_id):
         return None
     return find_user_by_id(user_id)
 
-# Forms
+
 class SetupForm(FlaskForm):
     db_host = StringField("DB Host", validators=[DataRequired()], default="localhost")
     db_port = StringField("DB Port", validators=[DataRequired()], default="3306")
-    db_name = StringField("DB Name", validators=[DataRequired()], default="inventory_db")
+    db_name = StringField(
+        "DB Name", validators=[DataRequired()], default="inventory_db"
+    )
     db_user = StringField("DB User", validators=[DataRequired()], default="inventory_user")
     db_pass = PasswordField("DB Password", validators=[DataRequired()])
-    admin_username = StringField("Admin Username", validators=[DataRequired(), Length(min=3, max=128)], default="admin")
-    admin_password = PasswordField("Admin Password", validators=[DataRequired(), Length(min=6)])
-    default_user_username = StringField("Default User Username", validators=[Optional(), Length(min=3, max=128)])
-    default_user_password = PasswordField("Default User Password", validators=[Optional(), Length(min=6)])
+    admin_username = StringField(
+        "Admin Username", validators=[DataRequired(), Length(min=3, max=128)], default="admin"
+    )
+    admin_password = PasswordField(
+        "Admin Password", validators=[DataRequired(), Length(min=6)]
+    )
+    default_user_username = StringField(
+        "Default User Username", validators=[Optional(), Length(min=3, max=128)]
+    )
+    default_user_password = PasswordField(
+        "Default User Password", validators=[Optional(), Length(min=6)]
+    )
     company_logo = FileField("Company Logo (PNG/JPEG)")
     submit = SubmitField("Initialize")
+
 
 class LoginForm(FlaskForm):
     username = StringField("Username", validators=[DataRequired()])
     password = PasswordField("Password", validators=[DataRequired()])
     remember = BooleanField("Remember Me")
     submit = SubmitField("Login")
+
 
 class ItemForm(FlaskForm):
     inventory_id = StringField("Inventory ID", validators=[DataRequired(), Length(min=1, max=64)])
@@ -185,11 +213,13 @@ class ItemForm(FlaskForm):
     model = StringField("Model", validators=[Optional(), Length(max=128)])
     submit = SubmitField("Save")
 
+
 class ProductionForm(FlaskForm):
     name = StringField("Name", validators=[DataRequired(), Length(min=1, max=255)])
     date = StringField("Date (YYYY-MM-DD)", validators=[Optional()])
     notes = TextAreaField("Notes", validators=[Optional()])
     submit = SubmitField("Save")
+
 
 def admin_required(f):
     @wraps(f)
@@ -202,7 +232,41 @@ def admin_required(f):
         return f(*args, **kwargs)
     return wrapper
 
-# Routes
+
+def save_logo(file):
+    filename = secure_filename(file.filename)
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in [".png", ".jpg", ".jpeg"]:
+        raise ValueError("Invalid logo type")
+    path = os.path.join(UPLOAD_DIR, "company_logo" + ext)
+    file.save(path)
+    return path
+
+
+def create_users(cur, admin_data, default_data=None):
+    cur.execute("SELECT id FROM users WHERE username=%s", (admin_data["username"],))
+    if not cur.fetchone():
+        cur.execute(
+            "INSERT INTO users (username,password_hash,is_admin) VALUES (%s,%s,%s)",
+            (admin_data["username"], generate_password_hash(admin_data["password"]), True),
+        )
+    if default_data:
+        cur.execute(
+            "SELECT id FROM users WHERE username=%s", (default_data["username"],)
+        )
+        if not cur.fetchone():
+            cur.execute(
+                "INSERT INTO users (username,password_hash,is_admin) VALUES (%s,%s,%s)",
+                (
+                    default_data["username"],
+                    generate_password_hash(default_data["password"]),
+                    False,
+                ),
+            )
+
+
+# --- Routes --- #
+
 @app.route("/setup", methods=["GET", "POST"])
 def setup():
     cfg = load_config()
@@ -210,18 +274,14 @@ def setup():
         return redirect(url_for("index"))
     form = SetupForm()
     if form.validate_on_submit():
-        # Save config
         logo_path = None
         file = form.company_logo.data
-        if file:
-            filename = secure_filename(file.filename)
-            if filename:
-                ext = os.path.splitext(filename)[1].lower()
-                if ext not in [".png", ".jpg", ".jpeg"]:
-                    flash("Logo must be PNG or JPEG.", "danger")
-                    return render_template("setup.html", form=form, configured=False)
-                logo_path = os.path.join(UPLOAD_DIR, "company_logo" + ext)
-                file.save(logo_path)
+        if file and file.filename:
+            try:
+                logo_path = save_logo(file)
+            except ValueError:
+                flash("Logo must be PNG or JPEG.", "danger")
+                return render_template("setup.html", form=form, configured=False)
 
         new_cfg = {
             "configured": True,
@@ -232,7 +292,7 @@ def setup():
             "db_pass": form.db_pass.data,
             "logo_path": logo_path,
         }
-        # Test DB and create tables
+
         try:
             with mariadb.connect(
                 user=new_cfg["db_user"],
@@ -240,7 +300,7 @@ def setup():
                 host=new_cfg["db_host"],
                 port=int(new_cfg["db_port"]),
                 database=new_cfg["db_name"],
-            ) as _:
+            ):
                 pass
         except mariadb.Error as ex:
             flash(f"Database connection failed: {ex}", "danger")
@@ -248,19 +308,15 @@ def setup():
 
         save_config(new_cfg)
         init_db()
-        # Create admin user
         conn = get_db()
         cur = conn.cursor()
-        cur.execute("SELECT id FROM users WHERE username=%s", (form.admin_username.data,))
-        if not cur.fetchone():
-            cur.execute("INSERT INTO users (username, password_hash, is_admin) VALUES (%s,%s,%s)",
-                        (form.admin_username.data, generate_password_hash(form.admin_password.data), True))
-        # Optional default user
-        if form.default_user_username.data and form.default_user_password.data:
-            cur.execute("SELECT id FROM users WHERE username=%s", (form.default_user_username.data,))
-            if not cur.fetchone():
-                cur.execute("INSERT INTO users (username, password_hash, is_admin) VALUES (%s,%s,%s)",
-                            (form.default_user_username.data, generate_password_hash(form.default_user_password.data), False))
+        create_users(
+            cur,
+            {"username": form.admin_username.data, "password": form.admin_password.data},
+            {"username": form.default_user_username.data, "password": form.default_user_password.data}
+            if form.default_user_username.data and form.default_user_password.data
+            else None
+        )
         conn.commit()
         cur.close()
         conn.close()
@@ -763,18 +819,16 @@ def admin_settings():
             flash("Logo updated.", "success")
     return render_template("admin_settings.html", cfg=cfg)
 
-if __name__ == "__main__":
-    cfg = load_config()
-    if not cfg.get("configured"):
-        # guide to /setup
-        print("App not configured. Visit /setup to initialize.")
-    else:
-        init_db()
-    app.run(host="0.0.0.0", port=8000, debug=True)
-
-# Optional: static serving of uploads in dev
-from flask import send_from_directory
+# Optional static serving
 @app.route('/uploads/<path:filename>')
 def uploads(filename):
     return send_from_directory('uploads', filename)
 
+
+if __name__ == "__main__":
+    cfg = load_config()
+    if not cfg.get("configured"):
+        print("App not configured. Visit /setup to initialize.")
+    else:
+        init_db()
+    app.run(host="0.0.0.0", port=8000, debug=True)
