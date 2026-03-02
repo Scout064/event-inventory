@@ -4,6 +4,6 @@ Flask-WTF==1.2.2
 WTForms==3.1.2
 Pillow==12.1.1
 Werkzeug==3.1.6
-qrcode==7.4.2
+qrcode==8.2
 reportlab==4.2.2
 mariadb==1.1.14
