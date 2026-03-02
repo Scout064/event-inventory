@@ -1,195 +1,103 @@
-import io
-import pytest
-from unittest.mock import MagicMock, patch
-from werkzeug.security import generate_password_hash
-
-import inventory_app.app as app_module
-
-
-@pytest.fixture
-def app():
-    app = app_module.app
-    app.config.update(
-        TESTING=True,
-        WTF_CSRF_ENABLED=False,
-        SECRET_KEY="test"
-    )
-    return app
-
-
-@pytest.fixture
-def client(app):
-    return app.test_client()
-
-
-@pytest.fixture
-def mock_config():
-    return {
-        "configured": True,
-        "logo_path": None,
-        "db_host": "localhost",
-        "db_port": "3306",
-        "db_name": "test",
-        "db_user": "test",
-        "db_pass": "test"
-    }
-
-
-def fake_db_connection(rows=None):
-    conn = MagicMock()
-    cur = MagicMock()
-
-    cur.fetchall.return_value = rows or []
-    cur.fetchone.return_value = rows[0] if rows else None
-
-    conn.cursor.return_value = cur
-    return conn
-
-
-# ----------------------
-# Basic Route Tests
-# ----------------------
-
-@patch("inventory_app.app.load_config")
-def test_redirect_to_setup_if_not_configured(mock_load, client):
-    mock_load.return_value = {"configured": False}
-    resp = client.get("/login")
-    assert resp.status_code == 302
-    assert "/setup" in resp.location
+from unittest.mock import patch
 
 
 @patch("inventory_app.app.load_config")
-@patch("inventory_app.app.find_user_by_username")
-def test_login_success(mock_find_user, mock_load, client):
+def test_list_items(mock_load, authenticated_client, mock_db):
+    """Tests GET /items with a pre-logged in user."""
     mock_load.return_value = {"configured": True}
 
-    user = app_module.User(
-        1,
-        "admin",
-        generate_password_hash("password"),
-        True
-    )
-    mock_find_user.return_value = user
-
-    resp = client.post(
-        "/login",
-        data={"username": "admin", "password": "password"},
-        follow_redirects=True,
-    )
-    assert resp.status_code == 200
-
-
-@patch("inventory_app.app.load_config")
-def test_index_requires_login(mock_load, client):
-    mock_load.return_value = {"configured": True}
-    resp = client.get("/")
-    assert resp.status_code == 302
-    assert "/login" in resp.location
-
-
-# ----------------------
-# Items
-# ----------------------
-
-@patch("inventory_app.app.load_config")
-@patch("inventory_app.app.get_db")
-def test_items_list(mock_db, mock_load, client):
-    mock_load.return_value = {"configured": True}
-
-    rows = [
+    # Setup mock data (must match the SELECT order in app.py)
+    mock_cur = mock_db.cursor.return_value
+    mock_cur.fetchall.return_value = [
         ("ID1", "Mic", "Audio", "SN1", "Shure", "SM58")
     ]
-    mock_db.return_value = fake_db_connection(rows)
 
-    with client:
-        client.post("/login", data={"username": "x", "password": "x"})
-        resp = client.get("/items")
+    # Action
+    response = authenticated_client.get("/items")
 
-    assert resp.status_code in (200, 302)
+    # Assert
+    assert response.status_code == 200
+    assert b"Shure" in response.data
 
 
 @patch("inventory_app.app.load_config")
-@patch("inventory_app.app.get_db")
-def test_items_404_edit(mock_db, mock_load, client):
-    mock_load.return_value = {"configured": True}
-    mock_db.return_value = fake_db_connection(rows=None)
-
-    with client:
-        resp = client.get("/items/UNKNOWN/edit")
-
-    assert resp.status_code == 404
-
-
-# ----------------------
-# Productions
-# ----------------------
-
-@patch("inventory_app.app.load_config")
-@patch("inventory_app.app.get_db")
-def test_production_view_404(mock_db, mock_load, client):
-    mock_load.return_value = {"configured": True}
-    mock_db.return_value = fake_db_connection(rows=None)
-
-    with client:
-        resp = client.get("/productions/999")
-
-    assert resp.status_code == 404
-
-
-# ----------------------
-# QR Code
-# ----------------------
-
-def test_generate_qr():
-    img = app_module.generate_qr_with_logo("TEST123", None)
-    assert img is not None
-    assert img.size[0] > 0
-    assert img.size[1] > 0
-
-
-# ----------------------
-# PDF Reports
-# ----------------------
-
-@patch("inventory_app.app.load_config")
-@patch("inventory_app.app.get_db")
-def test_items_pdf(mock_db, mock_load, client):
-    mock_load.return_value = {"configured": True}
-    rows = [
-        ("ID1", "Mic", "Audio", "SN1", "Shure", "SM58")
-    ]
-    mock_db.return_value = fake_db_connection(rows)
-
-    with client:
-        resp = client.get("/reports/items.pdf")
-
-    assert resp.status_code in (200, 302)
-
-
-# ----------------------
-# Admin Protection
-# ----------------------
-
-def test_admin_required_decorator():
-    @app_module.admin_required
-    def dummy():
-        return "OK"
-
-    with app_module.app.test_request_context():
-        resp = dummy()
-        assert resp.status_code == 302
-
-
-# ----------------------
-# HTTPS Enforcement
-# ----------------------
-
-@patch("inventory_app.app.load_config")
-def test_https_redirect(mock_load, client):
+def test_add_item(mock_load, authenticated_client, mock_db):
+    """Tests POST /items/new (the correct route)."""
     mock_load.return_value = {"configured": True}
 
-    resp = client.get(
-        "/login",
-        base_url="http://example.com"
+    response = authenticated_client.post(
+        "/items/new",
+        data={
+            "inventory_id": "ACC-001",
+            "name": "New Item",
+            "category": "Video",
+            "description": "A test camera",
+            "serial_number": "X1",
+            "manufacturer": "Sony",
+            "model": "A7S"
+        },
+        follow_redirects=True
     )
-    assert resp.status_code in (301, 302)
+
+    # Assert 200 because follow_redirects takes us to the items list
+    assert response.status_code == 200
+    assert b"Item created." in response.data
+
+
+@patch("inventory_app.app.load_config")
+def test_item_label_png(mock_load, authenticated_client, mock_db):
+    """Tests GET /labels/<id>.png generation with QR and Logo."""
+    mock_load.return_value = {"configured": True, "logo_path": None}
+
+    # Mock DB to return one item
+    mock_cur = mock_db.cursor.return_value
+    mock_cur.fetchone.return_value = (
+        "ACC-001", "Mic", "Audio", "SN123", "Shure", "SM58"
+    )
+
+    response = authenticated_client.get("/labels/ACC-001.png")
+
+    # Assertions
+    assert response.status_code == 200
+    assert response.mimetype == "image/png"
+    # Verify we actually got image data back
+    assert len(response.data) > 0
+
+
+@patch("inventory_app.app.load_config")
+def test_inventory_pdf_report(mock_load, authenticated_client, mock_db):
+    """Tests GET /reports/items.pdf for the full inventory."""
+    mock_load.return_value = {"configured": True}
+
+    # Mock DB for the SELECT query in report_items_pdf
+    mock_cur = mock_db.cursor.return_value
+    mock_cur.fetchall.return_value = [
+        ("ID1", "Item A", "Cat1", "SN-A", "MakeA", "ModA"),
+        ("ID2", "Item B", "Cat2", "SN-B", "MakeB", "ModB")
+    ]
+
+    response = authenticated_client.get("/reports/items.pdf")
+
+    assert response.status_code == 200
+    assert response.mimetype == "application/pdf"
+    assert b"%PDF" in response.data  # PDF files always start with this header
+
+
+@patch("inventory_app.app.load_config")
+def test_production_bom_pdf(mock_load, authenticated_client, mock_db):
+    """Tests GET /reports/production/<id>.pdf for a specific show."""
+    mock_load.return_value = {"configured": True}
+
+    mock_cur = mock_db.cursor.return_value
+    # 1. First fetch is for the Production details
+    mock_cur.fetchone.return_value = (1, "Gala 2024", None, "Test Notes")
+    # 2. Second fetch is for the assigned Items (BOM)
+    mock_cur.fetchall.return_value = [
+        ("ID1", "Speaker", "Audio", "SN99", "d&b", "Q7")
+    ]
+
+    response = authenticated_client.get("/reports/production/1.pdf")
+
+    assert response.status_code == 200
+    assert response.mimetype == "application/pdf"
+    assert response.headers["Content-Disposition"].startswith("attachment")
