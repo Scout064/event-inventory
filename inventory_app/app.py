@@ -8,19 +8,16 @@ from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file, abort, send_from_directory
 from flask_login import LoginManager, login_user, logout_user, current_user, login_required, UserMixin
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, SubmitField, BooleanField, TextAreaField, FileField, IntegerField
+from wtforms import StringField, PasswordField, SubmitField, BooleanField, TextAreaField, FileField
 from wtforms.validators import DataRequired, Length, Optional
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-
 import mariadb
 import qrcode
 from PIL import Image
-from reportlab.lib.pagesizes import A4, letter
+from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
-
-from pathlib import Path
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(APP_DIR, "config.json")
