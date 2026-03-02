@@ -1,1 +1,3 @@
-
+"""
+Inventory App package initialization.
+"""
