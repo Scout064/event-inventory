@@ -6,10 +6,10 @@ def test_list_items(mock_load, authenticated_client, mock_db):
     """Tests GET /items with a pre-logged in user."""
     mock_load.return_value = {"configured": True}
 
-    # Setup mock data
+    # Setup mock data (must match the SELECT order in app.py)
     mock_cur = mock_db.cursor.return_value
     mock_cur.fetchall.return_value = [
-        (1, "Mic", "Audio", "SN1", "Shure", "SM58")
+        ("ID1", "Mic", "Audio", "SN1", "Shure", "SM58")
     ]
 
     # Action
@@ -22,20 +22,24 @@ def test_list_items(mock_load, authenticated_client, mock_db):
 
 @patch("inventory_app.app.load_config")
 def test_add_item(mock_load, authenticated_client, mock_db):
-    """Tests POST /add."""
+    """Tests POST /items/new (the correct route)."""
     mock_load.return_value = {"configured": True}
 
+    # We need to provide the fields defined in your ItemForm
     response = authenticated_client.post(
-        "/add",
+        "/items/new",
         data={
+            "inventory_id": "ACC-001",
             "name": "New Item",
             "category": "Video",
-            "serial": "X1",
-            "make": "Sony",
+            "description": "A test camera",
+            "serial_number": "X1",
+            "manufacturer": "Sony",
             "model": "A7S"
         },
         follow_redirects=True
     )
 
+    # Assert 200 because follow_redirects takes us to the items list
     assert response.status_code == 200
-    assert b"Item added successfully" in response.data
+    assert b"Item created." in response.data
