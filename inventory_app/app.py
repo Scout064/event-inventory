@@ -123,8 +123,10 @@ def enforce_https():
     is_secure = request.is_secure or forwarded_proto == "https"
     remote_ip = request.remote_addr or ""
     if not is_secure and not LAN_REGEX.match(remote_ip):
-        url = request.url.replace("http://", "https://", 1)
-        return redirect(url, code=301)
+        domain = cfg.get("app_domain", request.host)
+        path = request.full_path
+        secure_url = f"https://{domain}{path}"
+        return redirect(secure_url, code=301)
 
 
 class User(UserMixin):
@@ -174,6 +176,11 @@ def load_user(user_id):
 
 
 class SetupForm(FlaskForm):
+    app_domain = StringField(
+        "App Domain (e.g., inventory.example.com)",
+        validators=[DataRequired()],
+        default="localhost:8000"
+    )
     db_host = StringField("DB Host", validators=[DataRequired()], default="localhost")
     db_port = StringField("DB Port", validators=[DataRequired()], default="3306")
     db_name = StringField(
@@ -286,6 +293,7 @@ def setup():
 
         new_cfg = {
             "configured": True,
+            "app_domain": form.app_domain.data.strip(),
             "db_host": form.db_host.data.strip(),
             "db_port": form.db_port.data.strip(),
             "db_name": form.db_name.data.strip(),
@@ -852,4 +860,4 @@ if __name__ == "__main__":
         print("App not configured. Visit /setup to initialize.")
     else:
         init_db()
-    app.run(host="0.0.0.0", port=8000, debug=True)
+    app.run(host="0.0.0.0", port=8000, debug=False)
