@@ -1,4 +1,3 @@
-import io
 import pytest
 from unittest.mock import MagicMock, patch
 from werkzeug.security import generate_password_hash
