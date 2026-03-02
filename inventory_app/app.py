@@ -177,8 +177,8 @@ def load_user(user_id):
 
 class SetupForm(FlaskForm):
     app_domain = StringField(
-        "App Domain (e.g., inventory.example.com)", 
-        validators=[DataRequired()], 
+        "App Domain (e.g., inventory.example.com)",
+        validators=[DataRequired()],
         default="localhost:8000"
     )
     db_host = StringField("DB Host", validators=[DataRequired()], default="localhost")
