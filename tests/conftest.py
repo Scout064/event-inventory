@@ -9,7 +9,7 @@ from werkzeug.security import generate_password_hash
 def app():
     flask_app.config.update({
         "TESTING": True,
-        "SECRET_KEY": "test_secret"
+        "SECRET_KEY": "test_secret",
         "WTF_CSRF_ENABLED": False
     })
     yield flask_app
