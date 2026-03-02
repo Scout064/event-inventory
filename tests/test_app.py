@@ -62,14 +62,15 @@ def test_redirect_to_setup_if_not_configured(mock_load, client):
 @patch("inventory_app.app.get_db")
 def test_login_success(mock_get_db, mock_find_user, mock_load, client):
     mock_load.return_value = {"configured": True}
-    mock_get_db.return_value = MagicMock()
+    
+    mock_conn = MagicMock()
+    mock_cur = mock_conn.cursor.return_value
+    mock_get_db.return_value = mock_conn
+    
+    hashed_pw = generate_password_hash("password")
+    mock_cur.fetchone.return_value = (1, "admin", hashed_pw, True)
 
-    user = app_module.User(
-        1,
-        "admin",
-        generate_password_hash("password"),
-        True
-    )
+    user = app_module.User(1, "admin", hashed_pw, True)
     mock_find_user.return_value = user
 
     resp = client.post(
@@ -77,6 +78,9 @@ def test_login_success(mock_get_db, mock_find_user, mock_load, client):
         data={"username": "admin", "password": "password"},
         follow_redirects=True,
     )
+    
+    assert resp.status_code == 200
+    assert b"Logout" in resp.data
     assert resp.status_code == 200
 
 
