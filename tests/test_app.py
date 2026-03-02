@@ -1,5 +1,5 @@
 from unittest.mock import patch
-import io
+
 
 @patch("inventory_app.app.load_config")
 def test_list_items(mock_load, authenticated_client, mock_db):
@@ -48,7 +48,7 @@ def test_add_item(mock_load, authenticated_client, mock_db):
 def test_item_label_png(mock_load, authenticated_client, mock_db):
     """Tests GET /labels/<id>.png generation with QR and Logo."""
     mock_load.return_value = {"configured": True, "logo_path": None}
-    
+
     # Mock DB to return one item
     mock_cur = mock_db.cursor.return_value
     mock_cur.fetchone.return_value = (
@@ -56,7 +56,7 @@ def test_item_label_png(mock_load, authenticated_client, mock_db):
     )
 
     response = authenticated_client.get("/labels/ACC-001.png")
-    
+
     # Assertions
     assert response.status_code == 200
     assert response.mimetype == "image/png"
@@ -68,7 +68,7 @@ def test_item_label_png(mock_load, authenticated_client, mock_db):
 def test_inventory_pdf_report(mock_load, authenticated_client, mock_db):
     """Tests GET /reports/items.pdf for the full inventory."""
     mock_load.return_value = {"configured": True}
-    
+
     # Mock DB for the SELECT query in report_items_pdf
     mock_cur = mock_db.cursor.return_value
     mock_cur.fetchall.return_value = [
@@ -77,7 +77,7 @@ def test_inventory_pdf_report(mock_load, authenticated_client, mock_db):
     ]
 
     response = authenticated_client.get("/reports/items.pdf")
-    
+
     assert response.status_code == 200
     assert response.mimetype == "application/pdf"
     assert b"%PDF" in response.data  # PDF files always start with this header
@@ -87,7 +87,7 @@ def test_inventory_pdf_report(mock_load, authenticated_client, mock_db):
 def test_production_bom_pdf(mock_load, authenticated_client, mock_db):
     """Tests GET /reports/production/<id>.pdf for a specific show."""
     mock_load.return_value = {"configured": True}
-    
+
     mock_cur = mock_db.cursor.return_value
     # 1. First fetch is for the Production details
     mock_cur.fetchone.return_value = (1, "Gala 2024", None, "Test Notes")
@@ -97,7 +97,7 @@ def test_production_bom_pdf(mock_load, authenticated_client, mock_db):
     ]
 
     response = authenticated_client.get("/reports/production/1.pdf")
-    
+
     assert response.status_code == 200
     assert response.mimetype == "application/pdf"
     assert response.headers["Content-Disposition"].startswith("attachment")
