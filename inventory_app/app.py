@@ -840,15 +840,18 @@ def report_production_pdf(pid):
 def admin_settings():
     cfg = load_config()
     if request.method == "POST":
-        cfg["site_name"] = request.form.get("site_name", "Event Inventory").strip()      
-        file = request.files.get("company_logo")
-        if file and file.filename:
-            filename = secure_filename(file.filename)
-            ext = os.path.splitext(filename)[1].lower()
-            if ext in [".png", ".jpg", ".jpeg"]:
-                logo_path = os.path.join(UPLOAD_DIR, "company_logo" + ext)
-                file.save(logo_path)
-                cfg["logo_path"] = logo_path
+        cfg["site_name"] = request.form.get("site_name", "Event Inventory").strip()
+        if request.form.get("remove_logo"):
+            cfg["logo_path"] = None
+        else:
+            file = request.files.get("company_logo")
+            if file and file.filename:
+                filename = secure_filename(file.filename)
+                ext = os.path.splitext(filename)[1].lower()
+                if ext in [".png", ".jpg", ".jpeg"]:
+                    logo_path = os.path.join(UPLOAD_DIR, "company_logo" + ext)
+                    file.save(logo_path)
+                    cfg["logo_path"] = logo_path
         save_config(cfg)
         flash("Branding updated.", "success")
         return redirect(url_for("admin_settings"))
