@@ -18,8 +18,14 @@
 {% if cfg.logo_path %}
 <hr>
 <p class="text-muted">Current logo preview:</p>
-<div class="border d-inline-block p-2">
-    <img src="/uploads/{{ cfg.logo_path.split('/')[-1] }}" style="max-height:120px">
+<div class="border rounded d-inline-block p-3 bg-light">
+    <img src="/uploads/{{ cfg.logo_path.split('/')[-1] }}" style="max-height:120px" class="d-block mb-2">    
+    <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="remove_logo" id="removeLogo">
+        <label class="form-check-label text-danger" for="removeLogo">
+            Remove logo and use text only
+        </label>
+    </div>
 </div>
 {% endif %}
 {% endblock %}
