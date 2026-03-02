@@ -1,5 +1,5 @@
 import sys
-import site  # <--- This is required
+import site
 
 # Add project path
 sys.path.insert(0, '/var/www/inventory')
@@ -8,4 +8,4 @@ sys.path.insert(0, '/var/www/inventory')
 site.addsitedir('/var/www/inventory/venv/lib/python3.11/site-packages')
 
 # Import your Flask app
-from app import app as application
+from app import app as application  # noqa: E402, F401
