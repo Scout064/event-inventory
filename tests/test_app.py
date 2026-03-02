@@ -78,7 +78,7 @@ def test_login_success(mock_get_db, mock_find_user, mock_load, client):
         data={"username": "admin", "password": "password"},
         follow_redirects=True,
     )
-    
+
     assert resp.status_code == 200
     assert b"Logout" in resp.data
     assert resp.status_code == 200
