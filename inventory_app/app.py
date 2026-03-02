@@ -273,6 +273,12 @@ def create_users(cur, admin_data, default_data=None):
             )
 
 
+@app.context_processor
+def inject_site_branding():
+    cfg = load_config()
+    return dict(site_cfg=cfg)
+
+
 # --- Routes --- #
 
 @app.route("/setup", methods=["GET", "POST"])
@@ -826,25 +832,29 @@ def report_production_pdf(pid):
     return send_file(bio, mimetype="application/pdf", as_attachment=True, download_name=f"production_{pid}_BOM.pdf")
 
 
-# Admin-only simple settings (logo update)
+# Admin-only simple settings
+
 @app.route("/admin/settings", methods=["GET", "POST"])
 @login_required
 @admin_required
 def admin_settings():
     cfg = load_config()
     if request.method == "POST":
-        file = request.files.get("company_logo")
-        if file and file.filename:
-            filename = secure_filename(file.filename)
-            ext = os.path.splitext(filename)[1].lower()
-            if ext not in [".png", ".jpg", ".jpeg"]:
-                flash("Logo must be PNG or JPEG.", "danger")
-                return redirect(url_for("admin_settings"))
-            logo_path = os.path.join(UPLOAD_DIR, "company_logo" + ext)
-            file.save(logo_path)
-            cfg["logo_path"] = logo_path
-            save_config(cfg)
-            flash("Logo updated.", "success")
+        cfg["site_name"] = request.form.get("site_name", "Event Inventory").strip()
+        if request.form.get("remove_logo"):
+            cfg["logo_path"] = None
+        else:
+            file = request.files.get("company_logo")
+            if file and file.filename:
+                filename = secure_filename(file.filename)
+                ext = os.path.splitext(filename)[1].lower()
+                if ext in [".png", ".jpg", ".jpeg"]:
+                    logo_path = os.path.join(UPLOAD_DIR, "company_logo" + ext)
+                    file.save(logo_path)
+                    cfg["logo_path"] = logo_path
+        save_config(cfg)
+        flash("Branding updated.", "success")
+        return redirect(url_for("admin_settings"))
     return render_template("admin_settings.html", cfg=cfg)
 
 
