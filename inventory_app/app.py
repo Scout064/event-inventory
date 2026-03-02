@@ -125,10 +125,14 @@ def enforce_https():
     remote_ip = request.remote_addr or ""
 
     if not is_secure and not LAN_REGEX.match(remote_ip):
-        host = request.host
-        path = request.full_path
-        secure_url = f"https://{host}{path}"
-        return redirect(secure_url, code=301)
+        trusted_host = cfg.get("app_domain")
+        if trusted_host:
+            path = request.full_path
+            secure_url = f"https://{trusted_host}{path}"
+            return redirect(secure_url, code=301)
+        else:
+            secure_url = f"https://{request.host}{request.full_path}"
+            return redirect(secure_url, code=301)
 
 
 class User(UserMixin):
