@@ -62,11 +62,11 @@ def test_redirect_to_setup_if_not_configured(mock_load, client):
 @patch("inventory_app.app.get_db")
 def test_login_success(mock_get_db, mock_find_user, mock_load, client):
     mock_load.return_value = {"configured": True}
-    
+
     mock_conn = MagicMock()
     mock_cur = mock_conn.cursor.return_value
     mock_get_db.return_value = mock_conn
-    
+
     hashed_pw = generate_password_hash("password")
     mock_cur.fetchone.return_value = (1, "admin", hashed_pw, True)
 
