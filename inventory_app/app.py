@@ -119,12 +119,16 @@ def enforce_https():
     cfg = load_config()
     if not cfg.get("configured"):
         return
+
     forwarded_proto = request.headers.get("X-Forwarded-Proto", "").lower()
     is_secure = request.is_secure or forwarded_proto == "https"
     remote_ip = request.remote_addr or ""
+
     if not is_secure and not LAN_REGEX.match(remote_ip):
-        url = request.url.replace("http://", "https://", 1)
-        return redirect(url, code=301)
+        host = request.host
+        path = request.full_path
+        secure_url = f"https://{host}{path}"
+        return redirect(secure_url, code=301)
 
 
 class User(UserMixin):
