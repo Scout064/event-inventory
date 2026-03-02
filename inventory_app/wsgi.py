@@ -1,5 +1,5 @@
 import sys
-import site  # <--- This is required
+import site
 
 # Add project path
 sys.path.insert(0, '/var/www/inventory')
