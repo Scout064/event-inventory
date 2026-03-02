@@ -39,3 +39,13 @@ def mock_db():
         mock_conn = MagicMock()
         mocked_get_db.return_value = mock_conn
         yield mock_conn
+
+
+@pytest.fixture
+def app():
+    flask_app.config.update({
+        "TESTING": True,
+        "SECRET_KEY": "test_secret",
+        "WTF_CSRF_ENABLED": False  # <--- Add this line
+    })
+    yield flask_app
