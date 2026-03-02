@@ -832,8 +832,7 @@ def report_production_pdf(pid):
     return send_file(bio, mimetype="application/pdf", as_attachment=True, download_name=f"production_{pid}_BOM.pdf")
 
 
-# Admin-only simple settings (logo update)
-# --- Update this in your app.py --- #
+# Admin-only simple settings
 
 @app.route("/admin/settings", methods=["GET", "POST"])
 @login_required
