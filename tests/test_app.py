@@ -59,6 +59,7 @@ def test_redirect_to_setup_if_not_configured(mock_load, client):
 
 @patch("inventory_app.app.load_config")
 @patch("inventory_app.app.find_user_by_username")
+@patch("inventory_app.app.get_db")
 def test_login_success(mock_find_user, mock_load, client):
     mock_load.return_value = {"configured": True}
 
