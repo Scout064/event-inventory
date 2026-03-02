@@ -1,3 +1,8 @@
+[![Python CI - Event Inventory](https://github.com/Scout064/event-inventory/actions/workflows/python-app.yml/badge.svg)](https://github.com/Scout064/event-inventory/actions/workflows/python-app.yml)
+[![CodeQL Advanced](https://github.com/Scout064/event-inventory/actions/workflows/codeql.yml/badge.svg)](https://github.com/Scout064/event-inventory/actions/workflows/codeql.yml)
+[![Dependabot Updates](https://github.com/Scout064/event-inventory/actions/workflows/dependabot/dependabot-updates/badge.svg)](https://github.com/Scout064/event-inventory/actions/workflows/dependabot/dependabot-updates)
+[![Dependency review](https://github.com/Scout064/event-inventory/actions/workflows/dependency-review.yml/badge.svg)](https://github.com/Scout064/event-inventory/actions/workflows/dependency-review.yml)
+
 # event-inventory
 "Event Inventory" is a very lightweight Flask App to manage your Event Inventory (subtle, I know ;))
 
