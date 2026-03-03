@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Search Results for: "{{ query }}"</h2>
+<hr>
+
+{# --- ITEMS SECTION --- #}
+<section class="mb-5">
+    <h3>📦 Items ({{ items|length }})</h3>
+    {% if items %}
+    <table class="table">
+        <thead>
+            <tr><th>ID</th><th>Name</th><th>Category</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td><code>{{ item[0] }}</code></td>
+                <td>{{ item[1] }}</td>
+                <td>{{ item[2] }}</td>
+                <td><a href="{{ url_for('items_edit', inventory_id=item[0]) }}">View/Edit</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">No items found.</p>
+    {% endif %}
+</section>
+
+{# --- PRODUCTIONS SECTION --- #}
+<section class="mb-5">
+    <h3>🎬 Productions ({{ productions|length }})</h3>
+    {% if productions %}
+    <table class="table">
+        <thead>
+            <tr><th>Name</th><th>Date</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+            {% for prod in productions %}
+            <tr>
+                <td><strong>{{ prod[1] }}</strong></td>
+                <td>{{ prod[2] }}</td>
+                <td><a href="{{ url_for('productions_view', pid=prod[0]) }}">Open BOM</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">No productions found.</p>
+    {% endif %}
+</section>
+
+{# --- USERS SECTION (Admin only view recommended) --- #}
+{% if current_user.is_admin %}
+<section class="mb-5">
+    <h3>👥 Users ({{ users|length }})</h3>
+    {% if users %}
+    <ul>
+        {% for user in users %}
+        <li>{{ user[1] }} {% if user[2] %}(Admin){% endif %}</li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted">No users found.</p>
+    {% endif %}
+</section>
+{% endif %}
+
+<a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Home</a>
+{% endblock %}
