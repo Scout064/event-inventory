@@ -29,3 +29,10 @@ CREATE TABLE IF NOT EXISTS production_items (
     FOREIGN KEY (production_id) REFERENCES productions(id) ON DELETE CASCADE,
     FOREIGN KEY (inventory_id) REFERENCES items(inventory_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS schema_version (
+    version INT PRIMARY KEY
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Initialize version if it's a fresh install
+INSERT IGNORE INTO schema_version (version) VALUES (1);
