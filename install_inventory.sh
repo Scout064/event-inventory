@@ -47,6 +47,9 @@ echo
 DB_NAME=${DB_NAME:-inventory_db}
 DB_USER=${DB_USER:-inventory_user}
 
+echo "=== Pre-loading Schema ==="
+mysql -u $DB_USER -p$DB_PASS $DB_NAME < /var/www/inventory/schema.sql
+
 mysql -u root -p$ROOT_PASS <<EOF
 CREATE DATABASE IF NOT EXISTS $DB_NAME;
 CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';
