@@ -832,6 +832,47 @@ def report_production_pdf(pid):
     return send_file(bio, mimetype="application/pdf", as_attachment=True, download_name=f"production_{pid}_BOM.pdf")
 
 
+@app.route("/search")
+@login_required
+def search():
+    query = request.args.get("q", "").strip()
+    if not query:
+        return redirect(url_for("index"))
+
+    search_term = f"%{query}%"
+    conn = get_db()
+    cur = conn.cursor()
+
+    # 1. Search Items
+    cur.execute("""
+        SELECT inventory_id, name, category, manufacturer FROM items 
+        WHERE name LIKE %s OR inventory_id LIKE %s OR serial_number LIKE %s OR model LIKE %s
+    """, (search_term, search_term, search_term, search_term))
+    item_results = cur.fetchall()
+
+    # 2. Search Productions
+    cur.execute("""
+        SELECT id, name, date FROM productions 
+        WHERE name LIKE %s OR notes LIKE %s
+    """, (search_term, search_term))
+    production_results = cur.fetchall()
+
+    # 3. Search Users (Optional, but useful if you have many)
+    cur.execute("SELECT id, username, is_admin FROM users WHERE username LIKE %s", (search_term,))
+    user_results = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return render_template(
+        "search_results.html", 
+        query=query, 
+        items=item_results, 
+        productions=production_results,
+        users=user_results
+    )
+
+
 # Admin-only simple settings
 
 @app.route("/admin/settings", methods=["GET", "POST"])
