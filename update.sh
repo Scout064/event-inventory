@@ -16,18 +16,23 @@ DB_PASS=$(python3 -c "import json; print(json.load(open('$CONFIG_FILE'))['db_pas
 DB_NAME=$(python3 -c "import json; print(json.load(open('$CONFIG_FILE'))['db_name'])")
 DB_HOST=$(python3 -c "import json; print(json.load(open('$CONFIG_FILE'))['db_host'])")
 
-# 3. Apply Schema.sql
-echo "Applying database schema..."
+# 1. Apply base schema (Always safe)
 mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$APP_DIR/schema.sql"
 
-# 4. Update Python Environment
-echo "Updating dependencies..."
-source venv/bin/activate
-pip install -r requirements.txt
+# 2. Check current version
+CURRENT_VER=$(mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" -N -s -e "SELECT version FROM schema_version;")
 
-# 5. Trigger Apache Reload
-# Touching wsgi.py tells mod_wsgi to restart the application on the next request
-echo "Reloading Flask application..."
+echo "Current DB Version: $CURRENT_VER"
+
+# 3. Apply Migrations based on version
+if [ "$CURRENT_VER" -lt 2 ]; then
+    echo "Upgrading to Version 2..."
+    # You can either point to a specific file or run a string
+    mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "ALTER TABLE items ADD COLUMN IF NOT EXISTS price DECIMAL(10,2) DEFAULT 0.00; UPDATE schema_version SET version = 2;"
+fi
+
+# if [ "$CURRENT_VER" -lt 3 ]; then ... upgrade logic ... fi
+
+# 4. Reload App
 touch "$APP_DIR/wsgi.py"
-
-echo "--- Deployment Successful ---"
+echo "--- Deployment Finished. ---"
