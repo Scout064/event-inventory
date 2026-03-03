@@ -2,7 +2,7 @@ name: Python CI - Event Inventory
 
 on:
   push:
-    branches: ["Beta"]
+    branches: ["Beta", "Update"]
   pull_request:
     branches: ["main"]
 
