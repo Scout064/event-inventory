@@ -845,14 +845,14 @@ def search():
 
     # 1. Search Items
     cur.execute("""
-        SELECT inventory_id, name, category, manufacturer FROM items 
+        SELECT inventory_id, name, category, manufacturer FROM items
         WHERE name LIKE %s OR inventory_id LIKE %s OR serial_number LIKE %s OR model LIKE %s
     """, (search_term, search_term, search_term, search_term))
     item_results = cur.fetchall()
 
     # 2. Search Productions
     cur.execute("""
-        SELECT id, name, date FROM productions 
+        SELECT id, name, date FROM productions
         WHERE name LIKE %s OR notes LIKE %s
     """, (search_term, search_term))
     production_results = cur.fetchall()
@@ -865,9 +865,9 @@ def search():
     conn.close()
 
     return render_template(
-        "search_results.html", 
-        query=query, 
-        items=item_results, 
+        "search_results.html",
+        query=query,
+        items=item_results,
         productions=production_results,
         users=user_results
     )
