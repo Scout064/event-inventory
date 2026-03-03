@@ -889,10 +889,27 @@ def uploads(filename):
     return send_from_directory('uploads', filename)
 
 
-if __name__ == "__main__":
+# --- Integrated Entry Point --- #
+
+def create_app():
+    """
+    Initializes the application logic.
+    This runs both in production (WSGI) and development (Manual).
+    """
     cfg = load_config()
     if not cfg.get("configured"):
-        print("App not configured. Visit /setup to initialize.")
+        # This prints to console or Apache error logs
+        print("WARNING: App not configured. Visit /setup to initialize.")
     else:
-        init_db()
-    app.run(host="0.0.0.0", port=8000, debug=False)
+        # Run DB initialization/migrations if configured
+        try:
+            init_db()
+        except Exception as e:
+            print(f"ERROR: Could not initialize database: {e}")
+    return app
+# WSGI entry point: Apache/mod_wsgi looks for an object named 'application'
+application = create_app()
+if __name__ == "__main__":
+    # This block ONLY runs if you type 'python app.py'
+    # Use application.run to ensure we use the instance returned by create_app()
+    application.run(host="0.0.0.0", port=8000, debug=False)
