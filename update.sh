@@ -28,7 +28,8 @@ echo "Current DB Version: $CURRENT_VER"
 if [ "$CURRENT_VER" -lt 2 ]; then
     echo "Upgrading to Version 2..."
     # You can either point to a specific file or run a string
-    mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "ALTER TABLE items ADD COLUMN IF NOT EXISTS price DECIMAL(10,2) DEFAULT 0.00; UPDATE schema_version SET version = 2;"
+    #mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "ALTER TABLE items ADD COLUMN IF NOT EXISTS price DECIMAL(10,2) DEFAULT 0.00; UPDATE schema_version SET version = 2;"
+    mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$APP_DIR/migrations.sql"
 fi
 
 # if [ "$CURRENT_VER" -lt 3 ]; then ... upgrade logic ... fi
