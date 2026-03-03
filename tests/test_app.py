@@ -114,9 +114,9 @@ def test_search_everything(mock_load, authenticated_client, mock_db):
     # 2. Productions results
     # 3. Users results
     mock_cur.fetchall.side_effect = [
-        [("ITEM-001", "Stage Monitor", "Audio", "d&b")], # Items
-        [(5, "Summer Festival", "2026-07-15")],          # Productions
-        [(2, "tech_user", 0)]                            # Users
+        [("ITEM-001", "Stage Monitor", "Audio", "d&b")],  # Items
+        [(5, "Summer Festival", "2026-07-15")],           # Productions
+        [(2, "tech_user", 0)]                             # Users
     ]
     # Action: Search for "Stage"
     response = authenticated_client.get("/search?q=Stage")
@@ -124,13 +124,15 @@ def test_search_everything(mock_load, authenticated_client, mock_db):
     assert response.status_code == 200
     # Check if Item result is present
     assert b"Stage Monitor" in response.data
-    assert b"ITEM-001" in response.data 
+    assert b"ITEM-001" in response.data
     # Check if Production result is present
-    assert b"Summer Festival" in response.data  
+    assert b"Summer Festival" in response.data
     # Check if User result is present (since the authenticated_client is likely admin)
-    assert b"tech_user" in response.data 
+    assert b"tech_user" in response.data
     # Verify the search term is displayed
     assert b'Search Results for: "Stage"' in response.data
+
+
 @patch("inventory_app.app.load_config")
 def test_search_empty_redirect(mock_load, authenticated_client, mock_db):
     """Tests that an empty search redirects to the index/items page."""
