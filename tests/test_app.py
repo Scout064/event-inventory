@@ -107,10 +107,8 @@ def test_production_bom_pdf(mock_load, authenticated_client, mock_db):
 def test_search_everything(mock_load, authenticated_client, mock_db):
     """Tests the global search for Items, Productions, and Users."""
     mock_load.return_value = {"configured": True}
-    
     # Access the mock cursor
     mock_cur = mock_db.cursor.return_value
-    
     # Define what the three sequential fetchall() calls should return:
     # 1. Items results
     # 2. Productions results
@@ -120,22 +118,17 @@ def test_search_everything(mock_load, authenticated_client, mock_db):
         [(5, "Summer Festival", "2026-07-15")],          # Productions
         [(2, "tech_user", 0)]                            # Users
     ]
-
     # Action: Search for "Stage"
     response = authenticated_client.get("/search?q=Stage")
-
     # Assertions
     assert response.status_code == 200
     # Check if Item result is present
     assert b"Stage Monitor" in response.data
-    assert b"ITEM-001" in response.data
-    
+    assert b"ITEM-001" in response.data 
     # Check if Production result is present
-    assert b"Summer Festival" in response.data
-    
+    assert b"Summer Festival" in response.data  
     # Check if User result is present (since the authenticated_client is likely admin)
-    assert b"tech_user" in response.data
-    
+    assert b"tech_user" in response.data 
     # Verify the search term is displayed
     assert b'Search Results for: "Stage"' in response.data
 @patch("inventory_app.app.load_config")
