@@ -908,6 +908,8 @@ def create_app():
             print(f"ERROR: Could not initialize database: {e}")
     return app
 # WSGI entry point: Apache/mod_wsgi looks for an object named 'application'
+
+
 application = create_app()
 if __name__ == "__main__":
     # This block ONLY runs if you type 'python app.py'
