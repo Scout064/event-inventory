@@ -64,40 +64,24 @@ def get_db():
 
 def init_db():
     conn = get_db()
+    if not conn:
+        return
     cur = conn.cursor()
-    cur.execute("""CREATE TABLE IF NOT EXISTS users (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        username VARCHAR(128) UNIQUE NOT NULL,
-        password_hash VARCHAR(255) NOT NULL,
-        is_admin BOOLEAN NOT NULL DEFAULT 0
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;""")
-
-    cur.execute("""CREATE TABLE IF NOT EXISTS items (
-        inventory_id VARCHAR(64) PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        category VARCHAR(128),
-        description TEXT,
-        serial_number VARCHAR(128),
-        manufacturer VARCHAR(128),
-        model VARCHAR(128)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;""")
-
-    cur.execute("""CREATE TABLE IF NOT EXISTS productions (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        date DATE NULL,
-        notes TEXT
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;""")
-
-    cur.execute("""CREATE TABLE IF NOT EXISTS production_items (
-        production_id INT NOT NULL,
-        inventory_id VARCHAR(64) NOT NULL,
-        PRIMARY KEY (production_id, inventory_id),
-        FOREIGN KEY (production_id) REFERENCES productions(id) ON DELETE CASCADE,
-        FOREIGN KEY (inventory_id) REFERENCES items(inventory_id) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;""")
-
-    conn.commit()
+    schema_path = os.path.join(APP_DIR, "schema.sql")
+    if os.path.exists(schema_path):
+        with open(schema_path, "r") as f:
+            # Split by semicolon to get individual commands
+            sql_commands = f.read().split(';')
+        for command in sql_commands:
+            if command.strip():
+                try:
+                    cur.execute(command)
+                except mariadb.Error as e:
+                    print(f"Error executing command: {e}")
+        conn.commit()
+        print("Database initialized from schema.sql")
+    else:
+        print("schema.sql not found. Skipping initialization.")
     cur.close()
     conn.close()
 
@@ -905,10 +889,29 @@ def uploads(filename):
     return send_from_directory('uploads', filename)
 
 
-if __name__ == "__main__":
+# --- Integrated Entry Point --- #
+
+def create_app():
+    """
+    Initializes the application logic.
+    This runs both in production (WSGI) and development (Manual).
+    """
     cfg = load_config()
     if not cfg.get("configured"):
-        print("App not configured. Visit /setup to initialize.")
+        # This prints to console or Apache error logs
+        print("WARNING: App not configured. Visit /setup to initialize.")
     else:
-        init_db()
-    app.run(host="0.0.0.0", port=8000, debug=False)
+        # Run DB initialization/migrations if configured
+        try:
+            init_db()
+        except Exception as e:
+            print(f"ERROR: Could not initialize database: {e}")
+    return app
+# WSGI entry point: Apache/mod_wsgi looks for an object named 'application'
+
+
+application = create_app()
+if __name__ == "__main__":
+    # This block ONLY runs if you type 'python app.py'
+    # Use application.run to ensure we use the instance returned by create_app()
+    application.run(host="0.0.0.0", port=8000, debug=False)
