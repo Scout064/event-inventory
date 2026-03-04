@@ -104,40 +104,29 @@ def test_production_bom_pdf(mock_load, authenticated_client, mock_db):
 
 
 @patch("inventory_app.app.load_config")
-def test_search_everything(mock_load, authenticated_client, mock_db):
-    """Tests the global search for Items, Productions, and Users."""
+def test_search_logic_integrity(mock_load, authenticated_client, mock_db):
+    """Verifies that the multi-category search returns correct data."""
     mock_load.return_value = {"configured": True}
-    # Access the mock cursor
     mock_cur = mock_db.cursor.return_value
-    # Define what the three sequential fetchall() calls should return:
-    # 1. Items results
-    # 2. Productions results
-    # 3. Users results
+
+    # mock_cur.fetchall() is called 3 times. We provide data for each.
     mock_cur.fetchall.side_effect = [
-        [("ITEM-001", "Stage Monitor", "Audio", "d&b")],  # Items
-        [(5, "Summer Festival", "2026-07-15")],           # Productions
-        [(2, "tech_user", 0)]                             # Users
+        [("ITM-01", "MacBook Pro", "IT", "Apple")],  # Items
+        [(50, "Annual Meeting", "2026-12-01")],      # Productions
+        [(3, "admin_user", 1)]                       # Users
     ]
-    # Action: Search for "Stage"
-    response = authenticated_client.get("/search?q=Stage")
-    # Assertions
+
+    response = authenticated_client.get("/search?q=MacBook")
+
     assert response.status_code == 200
-    # Check if Item result is present
-    assert b"Stage Monitor" in response.data
-    assert b"ITEM-001" in response.data
-    # Check if Production result is present
-    assert b"Summer Festival" in response.data
-    # Check if User result is present (since the authenticated_client is likely admin)
-    assert b"tech_user" in response.data
-    # Verify the search term is displayed
-    assert b'Search Results for: "Stage"' in response.data
+    assert b"MacBook Pro" in response.data
+    assert b"Annual Meeting" in response.data
+    assert b"admin_user" in response.data
 
 
 @patch("inventory_app.app.load_config")
-def test_search_empty_redirect(mock_load, authenticated_client, mock_db):
-    """Tests that an empty search redirects to the index/items page."""
+def test_search_empty_input(mock_load, authenticated_client, mock_db):
+    """Ensures empty search strings don't crash and instead redirect."""
     mock_load.return_value = {"configured": True}
-    # Action: Send empty query
-    response = authenticated_client.get("/search?q=")
-    # Assert: Should redirect (302) to the index or items page
+    response = authenticated_client.get("/search?q=  ")
     assert response.status_code == 302

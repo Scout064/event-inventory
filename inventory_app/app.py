@@ -820,30 +820,37 @@ def report_production_pdf(pid):
 @login_required
 def search():
     query = request.args.get("q", "").strip()
+
     if not query:
         return redirect(url_for("index"))
 
     search_term = f"%{query}%"
     conn = get_db()
+    if not conn:
+        flash("Database connection error.", "danger")
+        return redirect(url_for("index"))
+
     cur = conn.cursor()
 
-    # 1. Search Items
+    # 1. Search Items (Matched with your schema)
     cur.execute("""
-        SELECT inventory_id, name, category, manufacturer FROM items
+        SELECT inventory_id, name, category, manufacturer
+        FROM items
         WHERE name LIKE %s OR inventory_id LIKE %s OR serial_number LIKE %s OR model LIKE %s
     """, (search_term, search_term, search_term, search_term))
-    item_results = cur.fetchall()
+    items_list = cur.fetchall()
 
     # 2. Search Productions
     cur.execute("""
-        SELECT id, name, date FROM productions
+        SELECT id, name, date
+        FROM productions
         WHERE name LIKE %s OR notes LIKE %s
     """, (search_term, search_term))
-    production_results = cur.fetchall()
+    productions_list = cur.fetchall()
 
-    # 3. Search Users (Optional, but useful if you have many)
+    # 3. Search Users
     cur.execute("SELECT id, username, is_admin FROM users WHERE username LIKE %s", (search_term,))
-    user_results = cur.fetchall()
+    users_list = cur.fetchall()
 
     cur.close()
     conn.close()
@@ -851,9 +858,9 @@ def search():
     return render_template(
         "search_results.html",
         query=query,
-        items=item_results,
-        productions=production_results,
-        users=user_results
+        items=items_list,
+        productions=productions_list,
+        users=users_list
     )
 
 
