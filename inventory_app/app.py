@@ -822,32 +822,37 @@ def search():
     query = request.args.get("q", "").strip()
     if not query:
         return redirect(url_for("index"))
-
     search_term = f"%{query}%"
     conn = get_db()
     cur = conn.cursor()
-
-    # 1. Search Items
     cur.execute("""
-        SELECT inventory_id, name, category, manufacturer FROM items
+        SELECT inventory_id, name, category, manufacturer
+        FROM items
         WHERE name LIKE %s OR inventory_id LIKE %s OR serial_number LIKE %s OR model LIKE %s
     """, (search_term, search_term, search_term, search_term))
-    item_results = cur.fetchall()
-
-    # 2. Search Productions
+    items = cur.fetchall()
     cur.execute("""
-        SELECT id, name, date FROM productions
+        SELECT id, name, date
+        FROM productions
         WHERE name LIKE %s OR notes LIKE %s
     """, (search_term, search_term))
-    production_results = cur.fetchall()
-
-    # 3. Search Users (Optional, but useful if you have many)
-    cur.execute("SELECT id, username, is_admin FROM users WHERE username LIKE %s", (search_term,))
-    user_results = cur.fetchall()
-
+    productions = cur.fetchall()
+    cur.execute("""
+        SELECT id, username, is_admin
+        FROM users
+        WHERE username LIKE %s
+    """, (search_term,))
+    users = cur.fetchall()
     cur.close()
     conn.close()
-
+    return render_template(
+        "search_results.html",
+        query=query,
+        items=items,
+        productions=productions,
+        users=users
+    )
+    return render_template("search_results.html", query=query, items=items, productions=productions)
     return render_template(
         "search_results.html",
         query=query,
