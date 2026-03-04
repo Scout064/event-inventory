@@ -6,7 +6,7 @@ echo "=== Updating system packages ==="
 apt update && apt upgrade -y
 
 echo "=== Installing Apache2, mod_wsgi, Python, and MariaDB ==="
-apt install -y apache2 libapache2-mod-wsgi-py3 python3 python3-venv python3-pip mariadb-server libmariadb3 libmariadb-dev
+apt install -y apache2 libapache2-mod-wsgi-py3 python3 python3-venv python3-pip mariadb-server libmariadb3 libmariadb-dev rsync
 
 echo "=== Securing MariaDB installation ==="
 mysql_secure_installation
