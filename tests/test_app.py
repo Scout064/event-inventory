@@ -1,6 +1,5 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-# --- EXISTING TESTS ---
 
 @patch("inventory_app.app.load_config")
 def test_list_items(mock_load, authenticated_client, mock_db):
@@ -13,6 +12,7 @@ def test_list_items(mock_load, authenticated_client, mock_db):
     response = authenticated_client.get("/items")
     assert response.status_code == 200
     assert b"Shure" in response.data
+
 
 @patch("inventory_app.app.load_config")
 def test_add_item(mock_load, authenticated_client, mock_db):
@@ -34,6 +34,7 @@ def test_add_item(mock_load, authenticated_client, mock_db):
     assert response.status_code == 200
     assert b"Item created." in response.data
 
+
 @patch("inventory_app.app.load_config")
 def test_item_label_png(mock_load, authenticated_client, mock_db):
     """Tests GET /labels/<id>.png generation."""
@@ -47,6 +48,7 @@ def test_item_label_png(mock_load, authenticated_client, mock_db):
     assert response.mimetype == "image/png"
     assert len(response.data) > 0
 
+
 @patch("inventory_app.app.load_config")
 def test_inventory_pdf_report(mock_load, authenticated_client, mock_db):
     """Tests GET /reports/items.pdf."""
@@ -58,6 +60,7 @@ def test_inventory_pdf_report(mock_load, authenticated_client, mock_db):
     response = authenticated_client.get("/reports/items.pdf")
     assert response.status_code == 200
     assert b"%PDF" in response.data
+
 
 @patch("inventory_app.app.load_config")
 def test_search_logic_integrity(mock_load, authenticated_client, mock_db):
@@ -74,30 +77,26 @@ def test_search_logic_integrity(mock_load, authenticated_client, mock_db):
     assert b"MacBook Pro" in response.data
     assert b"Annual Meeting" in response.data
 
-# --- NEW ADMIN USER MANAGEMENT TESTS ---
 
 @patch("inventory_app.app.load_config")
 def test_admin_view_user_list(mock_load, authenticated_client, mock_db):
     """Tests that an Admin can view the user management page."""
     mock_load.return_value = {"configured": True}
     mock_cur = mock_db.cursor.return_value
-    # Mock returning two users: the admin and a technician
     mock_cur.fetchall.return_value = [
         (1, "admin", "hash", 1),
         (2, "tech_user", "hash", 0)
     ]
-
     response = authenticated_client.get("/admin/users")
-    
     assert response.status_code == 200
     assert b"Manage Users" in response.data
     assert b"tech_user" in response.data
+
 
 @patch("inventory_app.app.load_config")
 def test_admin_add_user_success(mock_load, authenticated_client, mock_db):
     """Tests the Admin's ability to create a new user."""
     mock_load.return_value = {"configured": True}
-    
     response = authenticated_client.post(
         "/admin/users/new",
         data={
@@ -107,42 +106,30 @@ def test_admin_add_user_success(mock_load, authenticated_client, mock_db):
         },
         follow_redirects=True
     )
-
     assert response.status_code == 200
     assert b"User created successfully" in response.data
-    
-    # Check if the DB execute was called for INSERT
     mock_cur = mock_db.cursor.return_value
     mock_cur.execute.assert_called()
+
 
 @patch("inventory_app.app.load_config")
 def test_admin_delete_other_user(mock_load, authenticated_client, mock_db):
     """Tests deleting a different user (ID 2)."""
     mock_load.return_value = {"configured": True}
-
-    # Action: Delete User ID 2 (Authenticated Admin is ID 1)
     response = authenticated_client.post("/admin/users/2/delete", follow_redirects=True)
-
     assert response.status_code == 200
     assert b"User deleted successfully" in response.data
-    
-    # Verify the DELETE query was fired
     mock_cur = mock_db.cursor.return_value
     mock_cur.execute.assert_any_call("DELETE FROM users WHERE id=%s", (2,))
+
 
 @patch("inventory_app.app.load_config")
 def test_admin_delete_self_safety_check(mock_load, authenticated_client, mock_db):
     """Verifies the safety check: Admin cannot delete themselves."""
     mock_load.return_value = {"configured": True}
-
-    # Action: Admin (ID 1) tries to delete ID 1
     response = authenticated_client.post("/admin/users/1/delete", follow_redirects=True)
-
     assert response.status_code == 200
     assert b"You cannot delete your own admin account" in response.data
-    
-    # Verify that NO delete query was executed for ID 1
     mock_cur = mock_db.cursor.return_value
     for call in mock_cur.execute.call_args_list:
-        # Check that 'DELETE FROM users' isn't being called on ID 1
         assert not (call[0][0].startswith("DELETE FROM users") and call[0][1] == (1,))
