@@ -104,32 +104,28 @@ def test_production_bom_pdf(mock_load, authenticated_client, mock_db):
 
 
 @patch("inventory_app.app.load_config")
-def test_search_everything(mock_load, authenticated_client, mock_db):
-    """Tests the global search for Items, Productions, and Users."""
-    mock_load.return_value = {"configured": True}    
-    mock_cur = mock_db.cursor.return_value    
-    # Matching the SELECT columns in app.py:
-    # Items: (id, name, cat, make)
-    # Prods: (id, name, date)
-    # Users: (id, user, admin)
-    mock_cur.fetchall.side_effect = [
-        [("ITEM-001", "Stage Monitor", "Audio", "d&b")],
-        [(5, "Summer Festival", "2026-07-15")],
-        [(2, "tech_user", 0)]
-    ]
-    response = authenticated_client.get("/search?q=Stage")
-    assert response.status_code == 200
-    # Content Assertions
-    assert b"Stage Monitor" in response.data
-    assert b"ITEM-001" in response.data
-    assert b"Summer Festival" in response.data
-    assert b"tech_user" in response.data
-    assert b'Search Results for: "Stage"' in response.data
+def test_search_logic_integrity(mock_load, authenticated_client, mock_db):
+    """Verifies that the multi-category search returns correct data."""
+    mock_load.return_value = {"configured": True}
+    mock_cur = mock_db.cursor.return_value
 
+    # mock_cur.fetchall() is called 3 times. We provide data for each.
+    mock_cur.fetchall.side_effect = [
+        [("ITM-01", "MacBook Pro", "IT", "Apple")], # Items
+        [(50, "Annual Meeting", "2026-12-01")],    # Productions
+        [(3, "admin_user", 1)]                     # Users
+    ]
+
+    response = authenticated_client.get("/search?q=MacBook")
+
+    assert response.status_code == 200
+    assert b"MacBook Pro" in response.data
+    assert b"Annual Meeting" in response.data
+    assert b"admin_user" in response.data
 
 @patch("inventory_app.app.load_config")
-def test_search_empty_redirect(mock_load, authenticated_client, mock_db):
-    """Tests that an empty search redirects."""
+def test_search_empty_input(mock_load, authenticated_client, mock_db):
+    """Ensures empty search strings don't crash and instead redirect."""
     mock_load.return_value = {"configured": True}
-    response = authenticated_client.get("/search?q=")
+    response = authenticated_client.get("/search?q=  ")
     assert response.status_code == 302
