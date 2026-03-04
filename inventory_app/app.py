@@ -213,6 +213,13 @@ class ProductionForm(FlaskForm):
     submit = SubmitField("Save")
 
 
+class UserAdminForm(FlaskForm):
+    username = StringField("Username", validators=[DataRequired(), Length(min=3, max=128)])
+    password = PasswordField("Password (leave blank to keep current)", validators=[Optional(), Length(min=6)])
+    is_admin = BooleanField("Grant Admin Privileges")
+    submit = SubmitField("Save User")
+
+
 def admin_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
@@ -864,7 +871,7 @@ def search():
     )
 
 
-# Admin-only simple settings
+# Admin-only routes
 
 @app.route("/admin/settings", methods=["GET", "POST"])
 @login_required
@@ -888,6 +895,73 @@ def admin_settings():
         flash("Branding updated.", "success")
         return redirect(url_for("admin_settings"))
     return render_template("admin_settings.html", cfg=cfg)
+
+
+@app.route("/admin/users")
+@login_required
+@admin_required
+def admin_users():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT id, username, is_admin FROM users ORDER BY username")
+    users = cur.fetchall()
+    cur.close()
+    conn.close()
+    return render_template("admin_users.html", users=users)
+
+@app.route("/admin/users/new", methods=["GET", "POST"])
+@app.route("/admin/users/<int:user_id>/edit", methods=["GET", "POST"])
+@login_required
+@admin_required
+def admin_user_edit(user_id=None):
+    conn = get_db()
+    cur = conn.cursor()
+    user_to_edit = None
+
+    if user_id:
+        cur.execute("SELECT id, username, is_admin FROM users WHERE id=%s", (user_id,))
+        user_to_edit = cur.fetchone()
+        if not user_to_edit:
+            abort(404)
+
+    form = UserAdminForm()
+
+    # Pre-fill if editing
+    if request.method == "GET" and user_to_edit:
+        form.username.data = user_to_edit[1]
+        form.is_admin.data = bool(user_to_edit[2])
+
+    if form.validate_on_submit():
+        uname = form.username.data.strip()
+        is_admin = 1 if form.is_admin.data else 0
+        pw = form.password.data
+
+        try:
+            if user_id:
+                if pw:
+                    cur.execute("UPDATE users SET username=%s, password_hash=%s, is_admin=%s WHERE id=%s",
+                                (uname, generate_password_hash(pw), is_admin, user_id))
+                else:
+                    cur.execute("UPDATE users SET username=%s, is_admin=%s WHERE id=%s",
+                                (uname, is_admin, user_id))
+                flash("User updated.", "success")
+            else:
+                if not pw:
+                    flash("Password is required for new users.", "danger")
+                    return render_template("user_form.html", form=form, mode="new")
+                cur.execute("INSERT INTO users (username, password_hash, is_admin) VALUES (%s, %s, %s)",
+                            (uname, generate_password_hash(pw), is_admin))
+                flash("User created.", "success")
+
+            conn.commit()
+            return redirect(url_for("admin_users"))
+        except mariadb.Error as e:
+            flash(f"Error: {e}", "danger")
+        finally:
+            cur.close()
+            conn.close()
+
+    return render_template("user_form.html", form=form, mode="edit" if user_id else "new")
 
 
 # Optional static serving
