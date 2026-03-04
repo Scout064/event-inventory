@@ -909,6 +909,7 @@ def admin_users():
     conn.close()
     return render_template("admin_users.html", users=users)
 
+
 @app.route("/admin/users/new", methods=["GET", "POST"])
 @app.route("/admin/users/<int:user_id>/edit", methods=["GET", "POST"])
 @login_required
