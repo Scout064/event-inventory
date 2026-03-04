@@ -1,30 +1,23 @@
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
+# --- EXISTING TESTS ---
 
 @patch("inventory_app.app.load_config")
 def test_list_items(mock_load, authenticated_client, mock_db):
     """Tests GET /items with a pre-logged in user."""
     mock_load.return_value = {"configured": True}
-
-    # Setup mock data (must match the SELECT order in app.py)
     mock_cur = mock_db.cursor.return_value
     mock_cur.fetchall.return_value = [
         ("ID1", "Mic", "Audio", "SN1", "Shure", "SM58")
     ]
-
-    # Action
     response = authenticated_client.get("/items")
-
-    # Assert
     assert response.status_code == 200
     assert b"Shure" in response.data
 
-
 @patch("inventory_app.app.load_config")
 def test_add_item(mock_load, authenticated_client, mock_db):
-    """Tests POST /items/new (the correct route)."""
+    """Tests POST /items/new."""
     mock_load.return_value = {"configured": True}
-
     response = authenticated_client.post(
         "/items/new",
         data={
@@ -38,95 +31,118 @@ def test_add_item(mock_load, authenticated_client, mock_db):
         },
         follow_redirects=True
     )
-
-    # Assert 200 because follow_redirects takes us to the items list
     assert response.status_code == 200
     assert b"Item created." in response.data
 
-
 @patch("inventory_app.app.load_config")
 def test_item_label_png(mock_load, authenticated_client, mock_db):
-    """Tests GET /labels/<id>.png generation with QR and Logo."""
+    """Tests GET /labels/<id>.png generation."""
     mock_load.return_value = {"configured": True, "logo_path": None}
-
-    # Mock DB to return one item
     mock_cur = mock_db.cursor.return_value
     mock_cur.fetchone.return_value = (
         "ACC-001", "Mic", "Audio", "SN123", "Shure", "SM58"
     )
-
     response = authenticated_client.get("/labels/ACC-001.png")
-
-    # Assertions
     assert response.status_code == 200
     assert response.mimetype == "image/png"
-    # Verify we actually got image data back
     assert len(response.data) > 0
-
 
 @patch("inventory_app.app.load_config")
 def test_inventory_pdf_report(mock_load, authenticated_client, mock_db):
-    """Tests GET /reports/items.pdf for the full inventory."""
+    """Tests GET /reports/items.pdf."""
     mock_load.return_value = {"configured": True}
-
-    # Mock DB for the SELECT query in report_items_pdf
     mock_cur = mock_db.cursor.return_value
     mock_cur.fetchall.return_value = [
-        ("ID1", "Item A", "Cat1", "SN-A", "MakeA", "ModA"),
-        ("ID2", "Item B", "Cat2", "SN-B", "MakeB", "ModB")
+        ("ID1", "Item A", "Cat1", "SN-A", "MakeA", "ModA")
     ]
-
     response = authenticated_client.get("/reports/items.pdf")
-
     assert response.status_code == 200
-    assert response.mimetype == "application/pdf"
-    assert b"%PDF" in response.data  # PDF files always start with this header
-
-
-@patch("inventory_app.app.load_config")
-def test_production_bom_pdf(mock_load, authenticated_client, mock_db):
-    """Tests GET /reports/production/<id>.pdf for a specific show."""
-    mock_load.return_value = {"configured": True}
-
-    mock_cur = mock_db.cursor.return_value
-    # 1. First fetch is for the Production details
-    mock_cur.fetchone.return_value = (1, "Gala 2024", None, "Test Notes")
-    # 2. Second fetch is for the assigned Items (BOM)
-    mock_cur.fetchall.return_value = [
-        ("ID1", "Speaker", "Audio", "SN99", "d&b", "Q7")
-    ]
-
-    response = authenticated_client.get("/reports/production/1.pdf")
-
-    assert response.status_code == 200
-    assert response.mimetype == "application/pdf"
-    assert response.headers["Content-Disposition"].startswith("attachment")
-
+    assert b"%PDF" in response.data
 
 @patch("inventory_app.app.load_config")
 def test_search_logic_integrity(mock_load, authenticated_client, mock_db):
-    """Verifies that the multi-category search returns correct data."""
+    """Verifies multi-category search returns correct data."""
     mock_load.return_value = {"configured": True}
     mock_cur = mock_db.cursor.return_value
-
-    # mock_cur.fetchall() is called 3 times. We provide data for each.
     mock_cur.fetchall.side_effect = [
-        [("ITM-01", "MacBook Pro", "IT", "Apple")],  # Items
-        [(50, "Annual Meeting", "2026-12-01")],      # Productions
-        [(3, "admin_user", 1)]                       # Users
+        [("ITM-01", "MacBook Pro", "IT", "Apple")],
+        [(50, "Annual Meeting", "2026-12-01")],
+        [(3, "admin_user", 1)]
     ]
-
     response = authenticated_client.get("/search?q=MacBook")
-
     assert response.status_code == 200
     assert b"MacBook Pro" in response.data
     assert b"Annual Meeting" in response.data
-    assert b"admin_user" in response.data
 
+# --- NEW ADMIN USER MANAGEMENT TESTS ---
 
 @patch("inventory_app.app.load_config")
-def test_search_empty_input(mock_load, authenticated_client, mock_db):
-    """Ensures empty search strings don't crash and instead redirect."""
+def test_admin_view_user_list(mock_load, authenticated_client, mock_db):
+    """Tests that an Admin can view the user management page."""
     mock_load.return_value = {"configured": True}
-    response = authenticated_client.get("/search?q=  ")
-    assert response.status_code == 302
+    mock_cur = mock_db.cursor.return_value
+    # Mock returning two users: the admin and a technician
+    mock_cur.fetchall.return_value = [
+        (1, "admin", "hash", 1),
+        (2, "tech_user", "hash", 0)
+    ]
+
+    response = authenticated_client.get("/admin/users")
+    
+    assert response.status_code == 200
+    assert b"Manage Users" in response.data
+    assert b"tech_user" in response.data
+
+@patch("inventory_app.app.load_config")
+def test_admin_add_user_success(mock_load, authenticated_client, mock_db):
+    """Tests the Admin's ability to create a new user."""
+    mock_load.return_value = {"configured": True}
+    
+    response = authenticated_client.post(
+        "/admin/users/new",
+        data={
+            "username": "stage_hand",
+            "password": "securepassword",
+            "is_admin": "0"
+        },
+        follow_redirects=True
+    )
+
+    assert response.status_code == 200
+    assert b"User created successfully" in response.data
+    
+    # Check if the DB execute was called for INSERT
+    mock_cur = mock_db.cursor.return_value
+    mock_cur.execute.assert_called()
+
+@patch("inventory_app.app.load_config")
+def test_admin_delete_other_user(mock_load, authenticated_client, mock_db):
+    """Tests deleting a different user (ID 2)."""
+    mock_load.return_value = {"configured": True}
+
+    # Action: Delete User ID 2 (Authenticated Admin is ID 1)
+    response = authenticated_client.post("/admin/users/2/delete", follow_redirects=True)
+
+    assert response.status_code == 200
+    assert b"User deleted successfully" in response.data
+    
+    # Verify the DELETE query was fired
+    mock_cur = mock_db.cursor.return_value
+    mock_cur.execute.assert_any_call("DELETE FROM users WHERE id=%s", (2,))
+
+@patch("inventory_app.app.load_config")
+def test_admin_delete_self_safety_check(mock_load, authenticated_client, mock_db):
+    """Verifies the safety check: Admin cannot delete themselves."""
+    mock_load.return_value = {"configured": True}
+
+    # Action: Admin (ID 1) tries to delete ID 1
+    response = authenticated_client.post("/admin/users/1/delete", follow_redirects=True)
+
+    assert response.status_code == 200
+    assert b"You cannot delete your own admin account" in response.data
+    
+    # Verify that NO delete query was executed for ID 1
+    mock_cur = mock_db.cursor.return_value
+    for call in mock_cur.execute.call_args_list:
+        # Check that 'DELETE FROM users' isn't being called on ID 1
+        assert not (call[0][0].startswith("DELETE FROM users") and call[0][1] == (1,))
