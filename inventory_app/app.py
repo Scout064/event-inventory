@@ -820,7 +820,7 @@ def report_production_pdf(pid):
 @login_required
 def search():
     query = request.args.get("q", "").strip()
-    
+
     if not query:
         return redirect(url_for("index"))
 
@@ -829,21 +829,21 @@ def search():
     if not conn:
         flash("Database connection error.", "danger")
         return redirect(url_for("index"))
-        
+
     cur = conn.cursor()
 
     # 1. Search Items (Matched with your schema)
     cur.execute("""
-        SELECT inventory_id, name, category, manufacturer 
-        FROM items 
+        SELECT inventory_id, name, category, manufacturer
+        FROM items
         WHERE name LIKE %s OR inventory_id LIKE %s OR serial_number LIKE %s OR model LIKE %s
     """, (search_term, search_term, search_term, search_term))
     items_list = cur.fetchall()
 
     # 2. Search Productions
     cur.execute("""
-        SELECT id, name, date 
-        FROM productions 
+        SELECT id, name, date
+        FROM productions
         WHERE name LIKE %s OR notes LIKE %s
     """, (search_term, search_term))
     productions_list = cur.fetchall()
@@ -856,10 +856,10 @@ def search():
     conn.close()
 
     return render_template(
-        "search_results.html", 
-        query=query, 
-        items=items_list, 
-        productions=productions_list, 
+        "search_results.html",
+        query=query,
+        items=items_list,
+        productions=productions_list,
         users=users_list
     )
 
