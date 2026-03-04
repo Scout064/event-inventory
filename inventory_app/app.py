@@ -965,6 +965,31 @@ def admin_user_edit(user_id=None):
     return render_template("user_form.html", form=form, mode="edit" if user_id else "new")
 
 
+@app.route("/admin/users/<int:user_id>/delete", methods=["POST"])
+@login_required
+@admin_required
+def admin_user_delete(user_id):
+    # Prevent the admin from deleting themselves
+    if str(user_id) == str(current_user.id):
+        flash("You cannot delete your own admin account.", "danger")
+        return redirect(url_for("admin_users"))
+
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("DELETE FROM users WHERE id=%s", (user_id,))
+        conn.commit()
+        flash("User deleted successfully.", "success")
+    except mariadb.Error as e:
+        conn.rollback()
+        flash(f"Error deleting user: {e}", "danger")
+    finally:
+        cur.close()
+        conn.close()
+
+    return redirect(url_for("admin_users"))
+
+
 # Optional static serving
 @app.route('/uploads/<path:filename>')
 def uploads(filename):
