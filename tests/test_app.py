@@ -111,9 +111,9 @@ def test_search_logic_integrity(mock_load, authenticated_client, mock_db):
 
     # mock_cur.fetchall() is called 3 times. We provide data for each.
     mock_cur.fetchall.side_effect = [
-        [("ITM-01", "MacBook Pro", "IT", "Apple")], # Items
-        [(50, "Annual Meeting", "2026-12-01")],    # Productions
-        [(3, "admin_user", 1)]                     # Users
+        [("ITM-01", "MacBook Pro", "IT", "Apple")],  # Items
+        [(50, "Annual Meeting", "2026-12-01")],      # Productions
+        [(3, "admin_user", 1)]                       # Users
     ]
 
     response = authenticated_client.get("/search?q=MacBook")
@@ -122,6 +122,7 @@ def test_search_logic_integrity(mock_load, authenticated_client, mock_db):
     assert b"MacBook Pro" in response.data
     assert b"Annual Meeting" in response.data
     assert b"admin_user" in response.data
+
 
 @patch("inventory_app.app.load_config")
 def test_search_empty_input(mock_load, authenticated_client, mock_db):
