@@ -2,13 +2,17 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h3>Items</h3>
-  <a class="btn btn-primary" href="{{ url_for('items_new') }}">Add Item</a>
+  <div class="d-flex gap-2">
+    <input type="text" id="itemFilter" class="form-control" placeholder="Filter items...">
+    <a class="btn btn-primary text-nowrap" href="{{ url_for('items_new') }}">Add Item</a>
+  </div>
 </div>
+
 <table class="table table-striped table-sm">
   <thead><tr>
     <th>ID</th><th>Name</th><th>Category</th><th>Serial</th><th>Manufacturer</th><th>Model</th><th></th>
   </tr></thead>
-  <tbody>
+  <tbody id="itemTableBody">
   {% for r in rows %}
     <tr>
       <td><a href="{{ url_for('label_png', inventory_id=r[0]) }}" target="_blank">{{ r[0] }}</a></td>
@@ -27,4 +31,28 @@
   {% endfor %}
   </tbody>
 </table>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('itemFilter');
+    const tableBody = document.getElementById('itemTableBody');
+    const rows = tableBody.getElementsByTagName('tr');
+
+    searchInput.addEventListener('keyup', function() {
+      const filterValue = searchInput.value.toLowerCase();
+      
+      for (let i = 0; i < rows.length; i++) {
+        // Grab all text inside the current row (ID, Name, Category, etc.)
+        const rowText = rows[i].textContent.toLowerCase();
+        
+        // Show row if it matches the search, otherwise hide it
+        if (rowText.includes(filterValue)) {
+          rows[i].style.display = '';
+        } else {
+          rows[i].style.display = 'none';
+        }
+      }
+    });
+  });
+</script>
 {% endblock %}
