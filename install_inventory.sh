@@ -102,7 +102,7 @@ EOF
 # Setup Virtual Environment
 cd "$APP_DIR"
 python3 -m venv venv
-./venv/bin/pip install flask flask-login flask-wtf pillow qrcode reportlab mariadb
+./venv/bin/pip install -r requirements.txt
 
 # Apply initial schema
 mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$APP_DIR/schema.sql"
