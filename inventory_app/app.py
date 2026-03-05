@@ -885,7 +885,7 @@ def search():
 @login_required
 def profile():
     conn = get_db()
-    cur = conn.cursor()    
+    cur = conn.cursor()
     # Fetch current user's full data
     cur.execute("SELECT username, real_name, email, birthday FROM users WHERE id=%s", (current_user.id,))
     row = cur.fetchone()
