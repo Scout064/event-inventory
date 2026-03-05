@@ -64,40 +64,24 @@ def get_db():
 
 def init_db():
     conn = get_db()
+    if not conn:
+        return
     cur = conn.cursor()
-    cur.execute("""CREATE TABLE IF NOT EXISTS users (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        username VARCHAR(128) UNIQUE NOT NULL,
-        password_hash VARCHAR(255) NOT NULL,
-        is_admin BOOLEAN NOT NULL DEFAULT 0
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;""")
-
-    cur.execute("""CREATE TABLE IF NOT EXISTS items (
-        inventory_id VARCHAR(64) PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        category VARCHAR(128),
-        description TEXT,
-        serial_number VARCHAR(128),
-        manufacturer VARCHAR(128),
-        model VARCHAR(128)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;""")
-
-    cur.execute("""CREATE TABLE IF NOT EXISTS productions (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        date DATE NULL,
-        notes TEXT
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;""")
-
-    cur.execute("""CREATE TABLE IF NOT EXISTS production_items (
-        production_id INT NOT NULL,
-        inventory_id VARCHAR(64) NOT NULL,
-        PRIMARY KEY (production_id, inventory_id),
-        FOREIGN KEY (production_id) REFERENCES productions(id) ON DELETE CASCADE,
-        FOREIGN KEY (inventory_id) REFERENCES items(inventory_id) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;""")
-
-    conn.commit()
+    schema_path = os.path.join(APP_DIR, "schema.sql")
+    if os.path.exists(schema_path):
+        with open(schema_path, "r") as f:
+            # Split by semicolon to get individual commands
+            sql_commands = f.read().split(';')
+        for command in sql_commands:
+            if command.strip():
+                try:
+                    cur.execute(command)
+                except mariadb.Error as e:
+                    print(f"Error executing command: {e}")
+        conn.commit()
+        print("Database initialized from schema.sql")
+    else:
+        print("schema.sql not found. Skipping initialization.")
     cur.close()
     conn.close()
 
@@ -227,6 +211,13 @@ class ProductionForm(FlaskForm):
     date = StringField("Date (YYYY-MM-DD)", validators=[Optional()])
     notes = TextAreaField("Notes", validators=[Optional()])
     submit = SubmitField("Save")
+
+
+class UserAdminForm(FlaskForm):
+    username = StringField("Username", validators=[DataRequired(), Length(min=3, max=128)])
+    password = PasswordField("Password (leave blank to keep current)", validators=[Optional(), Length(min=6)])
+    is_admin = BooleanField("Grant Admin Privileges")
+    submit = SubmitField("Save User")
 
 
 def admin_required(f):
@@ -832,7 +823,55 @@ def report_production_pdf(pid):
     return send_file(bio, mimetype="application/pdf", as_attachment=True, download_name=f"production_{pid}_BOM.pdf")
 
 
-# Admin-only simple settings
+@app.route("/search")
+@login_required
+def search():
+    query = request.args.get("q", "").strip()
+
+    if not query:
+        return redirect(url_for("index"))
+
+    search_term = f"%{query}%"
+    conn = get_db()
+    if not conn:
+        flash("Database connection error.", "danger")
+        return redirect(url_for("index"))
+
+    cur = conn.cursor()
+
+    # 1. Search Items (Matched with your schema)
+    cur.execute("""
+        SELECT inventory_id, name, category, manufacturer
+        FROM items
+        WHERE name LIKE %s OR inventory_id LIKE %s OR serial_number LIKE %s OR model LIKE %s
+    """, (search_term, search_term, search_term, search_term))
+    items_list = cur.fetchall()
+
+    # 2. Search Productions
+    cur.execute("""
+        SELECT id, name, date
+        FROM productions
+        WHERE name LIKE %s OR notes LIKE %s
+    """, (search_term, search_term))
+    productions_list = cur.fetchall()
+
+    # 3. Search Users
+    cur.execute("SELECT id, username, is_admin FROM users WHERE username LIKE %s", (search_term,))
+    users_list = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return render_template(
+        "search_results.html",
+        query=query,
+        items=items_list,
+        productions=productions_list,
+        users=users_list
+    )
+
+
+# Admin-only routes
 
 @app.route("/admin/settings", methods=["GET", "POST"])
 @login_required
@@ -858,16 +897,128 @@ def admin_settings():
     return render_template("admin_settings.html", cfg=cfg)
 
 
+@app.route("/admin/users")
+@login_required
+@admin_required
+def admin_users():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT id, username, is_admin FROM users ORDER BY username")
+    users = cur.fetchall()
+    cur.close()
+    conn.close()
+    return render_template("admin_users.html", users=users)
+
+
+@app.route("/admin/users/new", methods=["GET", "POST"])
+@app.route("/admin/users/<int:user_id>/edit", methods=["GET", "POST"])
+@login_required
+@admin_required
+def admin_user_edit(user_id=None):
+    conn = get_db()
+    cur = conn.cursor()
+    user_to_edit = None
+
+    if user_id:
+        cur.execute("SELECT id, username, is_admin FROM users WHERE id=%s", (user_id,))
+        user_to_edit = cur.fetchone()
+        if not user_to_edit:
+            abort(404)
+
+    form = UserAdminForm()
+
+    # Pre-fill if editing
+    if request.method == "GET" and user_to_edit:
+        form.username.data = user_to_edit[1]
+        form.is_admin.data = bool(user_to_edit[2])
+
+    if form.validate_on_submit():
+        uname = form.username.data.strip()
+        is_admin = 1 if form.is_admin.data else 0
+        pw = form.password.data
+
+        try:
+            if user_id:
+                if pw:
+                    cur.execute("UPDATE users SET username=%s, password_hash=%s, is_admin=%s WHERE id=%s",
+                                (uname, generate_password_hash(pw), is_admin, user_id))
+                else:
+                    cur.execute("UPDATE users SET username=%s, is_admin=%s WHERE id=%s",
+                                (uname, is_admin, user_id))
+                flash("User updated.", "success")
+            else:
+                if not pw:
+                    flash("Password is required for new users.", "danger")
+                    return render_template("user_form.html", form=form, mode="new")
+                cur.execute("INSERT INTO users (username, password_hash, is_admin) VALUES (%s, %s, %s)",
+                            (uname, generate_password_hash(pw), is_admin))
+                flash("User created.", "success")
+
+            conn.commit()
+            return redirect(url_for("admin_users"))
+        except mariadb.Error as e:
+            flash(f"Error: {e}", "danger")
+        finally:
+            cur.close()
+            conn.close()
+
+    return render_template("user_form.html", form=form, mode="edit" if user_id else "new")
+
+
+@app.route("/admin/users/<int:user_id>/delete", methods=["POST"])
+@login_required
+@admin_required
+def admin_user_delete(user_id):
+    # Prevent the admin from deleting themselves
+    if str(user_id) == str(current_user.id):
+        flash("You cannot delete your own admin account.", "danger")
+        return redirect(url_for("admin_users"))
+
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("DELETE FROM users WHERE id=%s", (user_id,))
+        conn.commit()
+        flash("User deleted successfully.", "success")
+    except mariadb.Error as e:
+        conn.rollback()
+        flash(f"Error deleting user: {e}", "danger")
+    finally:
+        cur.close()
+        conn.close()
+
+    return redirect(url_for("admin_users"))
+
+
 # Optional static serving
 @app.route('/uploads/<path:filename>')
 def uploads(filename):
     return send_from_directory('uploads', filename)
 
 
-if __name__ == "__main__":
+# --- Integrated Entry Point --- #
+
+def create_app():
+    """
+    Initializes the application logic.
+    This runs both in production (WSGI) and development (Manual).
+    """
     cfg = load_config()
     if not cfg.get("configured"):
-        print("App not configured. Visit /setup to initialize.")
+        # This prints to console or Apache error logs
+        print("WARNING: App not configured. Visit /setup to initialize.")
     else:
-        init_db()
-    app.run(host="0.0.0.0", port=8000, debug=False)
+        # Run DB initialization/migrations if configured
+        try:
+            init_db()
+        except Exception as e:
+            print(f"ERROR: Could not initialize database: {e}")
+    return app
+# WSGI entry point: Apache/mod_wsgi looks for an object named 'application'
+
+
+application = create_app()
+if __name__ == "__main__":
+    # This block ONLY runs if you type 'python app.py'
+    # Use application.run to ensure we use the instance returned by create_app()
+    application.run(host="0.0.0.0", port=8000, debug=False)
