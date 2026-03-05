@@ -26,6 +26,7 @@ from werkzeug.utils import secure_filename
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
+import csv
 
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -473,6 +474,84 @@ def items_delete(inventory_id):
         cur.close()
         conn.close()
     return redirect(url_for("items"))
+
+
+@app.route("/items/template")
+@login_required
+def items_download_template():
+    """Generates and serves a blank CSV template for bulk import."""
+    bio = io.StringIO()
+    writer = csv.writer(bio)
+    # Headers based on ItemForm and DB schema
+    writer.writerow([
+        "inventory_id", "name", "category", "description",
+        "serial_number", "manufacturer", "model"
+    ])
+    # Add an example row for the user
+    writer.writerow([
+        "MIC-001", "SM58", "Audio", "Dynamic vocal microphone",
+        "SN123456", "Shure", "SM58-LC"
+    ])
+    output = io.BytesIO()
+    output.write(bio.getvalue().encode('utf-8'))
+    output.seek(0)
+    return send_file(
+        output,
+        mimetype="text/csv",
+        as_attachment=True,
+        download_name="inventory_import_template.csv"
+    )
+
+
+@app.route("/items/import", methods=["GET", "POST"])
+@login_required
+def items_import():
+    """Handles the uploading and processing of the bulk import CSV."""
+    if request.method == "POST":
+        file = request.files.get("csv_file")
+        if not file or not file.filename.endswith('.csv'):
+            flash("Please upload a valid CSV file.", "danger")
+            return redirect(url_for("items"))
+        stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
+        reader = csv.DictReader(stream)
+        conn = get_db()
+        cur = conn.cursor()
+        success_count = 0
+        error_count = 0
+        try:
+            for row in reader:
+                try:
+                    # Use INSERT IGNORE or handle duplicates to prevent script crashes
+                    cur.execute("""
+                        INSERT INTO items (inventory_id, name, category, description, serial_number, manufacturer, model)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        ON DUPLICATE KEY UPDATE
+                            name=VALUES(name), category=VALUES(category),
+                            description=VALUES(description), serial_number=VALUES(serial_number),
+                            manufacturer=VALUES(manufacturer), model=VALUES(model)
+                    """, (
+                        row['inventory_id'].strip(),
+                        row['name'].strip(),
+                        row.get('category', '').strip() or None,
+                        row.get('description', '').strip() or None,
+                        row.get('serial_number', '').strip() or None,
+                        row.get('manufacturer', '').strip() or None,
+                        row.get('model', '').strip() or None
+                    ))
+                    success_count += 1
+                except Exception as e:
+                    error_count += 1
+                    print(f"Row Error: {e}")
+            conn.commit()
+            flash(f"Import complete! {success_count} items updated/added. {error_count} errors.", "success")
+        except Exception as ex:
+            conn.rollback()
+            flash(f"Critical error during import: {ex}", "danger")
+        finally:
+            cur.close()
+            conn.close()
+        return redirect(url_for("items"))
+    return render_template("items_import.html")
 
 
 # Productions
