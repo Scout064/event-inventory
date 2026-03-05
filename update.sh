@@ -73,5 +73,7 @@ fi
 # 7. Reload WSGI App
 echo "Restarting application..."
 touch "$APP_DIR/wsgi.py"
+echo "Restarting apache2..."
+systemctl status apache2
 
 echo "--- Deployment Finished Successfully. ---"
