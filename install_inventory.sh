@@ -41,7 +41,7 @@ fi
 echo "--- Installing Dependencies ---"
 apt-get update
 
-CORE_DEPS=("mariadb-server" "mariadb-client" "python3" "python3-pip" "python3-venv" "apache2" "libapache2-mod-wsgi-py3" "rsync")
+CORE_DEPS=("mariadb-server" "mariadb-client" "python3" "python3-pip" "python3-venv" "apache2" "libapache2-mod-wsgi-py3" "rsync" "libmariadb-dev" "libmariadb-dev-compat")
 for pkg in "${CORE_DEPS[@]}"; do
     apt-get install -y "$pkg"
 done
