@@ -1,5 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+
 <div class="d-flex justify-content-between align-items-center mb-3">
   <div>
     <h3>{{ prod[1] }}</h3>
@@ -34,19 +36,34 @@
       </tbody>
     </table>
   </div>
+  
   <div class="col-md-5">
     <h5>Add Item to Production</h5>
     <form action="{{ url_for('productions_assign', pid=prod[0]) }}" method="post">
-      <div class="input-group">
-        <select name="inventory_id" class="form-select">
-          <option value="">Select item…</option>
+      <div class="mb-2">
+        <select id="item-search-select" name="inventory_id" placeholder="Search by name or ID...">
+          <option value="">Search by name or ID...</option>
           {% for i in all_items %}
             <option value="{{ i[0] }}">{{ i[1] }} ({{ i[0] }})</option>
           {% endfor %}
         </select>
-        <button class="btn btn-primary">Add</button>
       </div>
+      <button class="btn btn-primary w-100">Add Item</button>
     </form>
   </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+    new TomSelect("#item-search-select", {
+      create: false,
+      sortField: {
+        field: "text",
+        direction: "asc"
+      },
+      maxOptions: 50 // Limits how many items show at once to keep the browser fast
+    });
+  });
+</script>
 {% endblock %}
