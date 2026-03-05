@@ -18,9 +18,9 @@ from flask_login import (
 from flask_wtf import FlaskForm
 from wtforms import (
     StringField, PasswordField, SubmitField, BooleanField,
-    TextAreaField, FileField
+    TextAreaField, FileField, DateField
 )
-from wtforms.validators import DataRequired, Length, Optional
+from wtforms.validators import DataRequired, Length, Optional, Email
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from reportlab.lib.pagesizes import A4
@@ -218,6 +218,15 @@ class UserAdminForm(FlaskForm):
     password = PasswordField("Password (leave blank to keep current)", validators=[Optional(), Length(min=6)])
     is_admin = BooleanField("Grant Admin Privileges")
     submit = SubmitField("Save User")
+
+
+class UserProfileForm(FlaskForm):
+    username = StringField("Username", validators=[DataRequired(), Length(min=3, max=128)])
+    real_name = StringField("Real Name", validators=[Optional(), Length(max=255)])
+    email = StringField("E-Mail Address", validators=[Optional(), Email(), Length(max=255)])
+    birthday = DateField("Birthday", format='%Y-%m-%d', validators=[Optional()])
+    password = PasswordField("New Password (leave blank to keep current)", validators=[Optional(), Length(min=6)])
+    submit = SubmitField("Save Profile")
 
 
 def admin_required(f):
@@ -869,6 +878,62 @@ def search():
         productions=productions_list,
         users=users_list
     )
+
+
+# User Profile Route
+@app.route("/profile", methods=["GET", "POST"])
+@login_required
+def profile():
+    conn = get_db()
+    cur = conn.cursor()
+    # Fetch current user's full data
+    cur.execute("SELECT username, real_name, email, birthday FROM users WHERE id=%s", (current_user.id,))
+    row = cur.fetchone()
+    if not row:
+        cur.close()
+        conn.close()
+        abort(404)
+    form = UserProfileForm()
+    # Pre-fill the form on GET request
+    if request.method == "GET":
+        form.username.data = row[0]
+        form.real_name.data = row[1]
+        form.email.data = row[2]
+        form.birthday.data = row[3]  # WTForms DateField handles the datetime.date object automatically
+    if form.validate_on_submit():
+        uname = form.username.data.strip()
+        rname = form.real_name.data.strip() if form.real_name.data else None
+        email = form.email.data.strip() if form.email.data else None
+        bday = form.birthday.data
+        pw = form.password.data
+        try:
+            if pw:
+                # Update including new password
+                cur.execute("""UPDATE users
+                               SET username=%s, real_name=%s, email=%s, birthday=%s, password_hash=%s
+                               WHERE id=%s""",
+                            (uname, rname, email, bday, generate_password_hash(pw), current_user.id))
+            else:
+                # Update without changing password
+                cur.execute("""UPDATE users
+                               SET username=%s, real_name=%s, email=%s, birthday=%s
+                               WHERE id=%s""",
+                            (uname, rname, email, bday, current_user.id))
+            conn.commit()
+            # Keep the flask-login session in sync if they changed their username
+            current_user.username = uname
+            flash("Profile updated successfully.", "success")
+            return redirect(url_for("profile"))
+        except mariadb.Error as e:
+            conn.rollback()
+            # Handle duplicate username or email gracefully
+            if "Duplicate entry" in str(e):
+                flash("That Username or E-Mail is already in use by another account.", "danger")
+            else:
+                flash(f"Database Error: {e}", "danger")
+    cur.close()
+    conn.close()
+    return render_template("profile.html", form=form)
 
 
 # Admin-only routes
