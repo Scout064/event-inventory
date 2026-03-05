@@ -18,9 +18,9 @@ from flask_login import (
 from flask_wtf import FlaskForm
 from wtforms import (
     StringField, PasswordField, SubmitField, BooleanField,
-    TextAreaField, FileField
+    TextAreaField, FileField, DateField
 )
-from wtforms.validators import DataRequired, Length, Optional
+from wtforms.validators import DataRequired, Length, Optional, Email
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from reportlab.lib.pagesizes import A4
@@ -218,6 +218,15 @@ class UserAdminForm(FlaskForm):
     password = PasswordField("Password (leave blank to keep current)", validators=[Optional(), Length(min=6)])
     is_admin = BooleanField("Grant Admin Privileges")
     submit = SubmitField("Save User")
+
+
+class UserProfileForm(FlaskForm):
+    username = StringField("Username", validators=[DataRequired(), Length(min=3, max=128)])
+    real_name = StringField("Real Name", validators=[Optional(), Length(max=255)])
+    email = StringField("E-Mail Address", validators=[Optional(), Email(), Length(max=255)])
+    birthday = DateField("Birthday", format='%Y-%m-%d', validators=[Optional()])
+    password = PasswordField("New Password (leave blank to keep current)", validators=[Optional(), Length(min=6)])
+    submit = SubmitField("Save Profile")
 
 
 def admin_required(f):
