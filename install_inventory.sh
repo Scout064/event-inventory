@@ -104,8 +104,18 @@ cd "$APP_DIR"
 python3 -m venv venv
 ./venv/bin/pip install -r requirements.txt
 
-# Apply initial schema
+# Apply Schema & Migrations
+echo "Applying base schema and checking migrations..."
 mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$APP_DIR/schema.sql"
+
+CURRENT_VER=$(mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" -N -s -e "SELECT MAX(version) FROM schema_version;")
+[ -z "$CURRENT_VER" ] || [ "$CURRENT_VER" == "NULL" ] && CURRENT_VER=1
+
+if [ "$CURRENT_VER" -lt 2 ]; then
+    echo "Upgrading Database to Version 2..."
+    mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$APP_DIR/migrations.sql"
+    mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "DELETE FROM schema_version WHERE version < 2;"
+fi
 
 # Set Permissions
 chown -R www-data:www-data "$APP_DIR"
