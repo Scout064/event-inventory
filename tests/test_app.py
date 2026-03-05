@@ -1,4 +1,5 @@
 from unittest.mock import patch
+import io
 
 
 @patch("inventory_app.app.load_config")
@@ -138,3 +139,44 @@ def test_admin_delete_self_safety_check(mock_load, authenticated_client, mock_db
     mock_cur = mock_db.cursor.return_value
     for call in mock_cur.execute.call_args_list:
         assert not (call[0][0].startswith("DELETE FROM users") and call[0][1] == (1,))
+
+
+@patch("inventory_app.app.load_config")
+def test_items_download_template(mock_load, authenticated_client):
+    """Verifies the CSV template generation and headers."""
+    mock_load.return_value = {"configured": True}
+    response = authenticated_client.get("/items/template")
+    assert response.status_code == 200
+    assert response.mimetype == "text/csv"
+    # Verify the headers we defined in app.py are present
+    assert b"inventory_id,name,category,description,serial_number,manufacturer,model" in response.data
+    # Verify the example row is present
+    assert b"MIC-001,SM58" in response.data
+
+
+@patch("inventory_app.app.load_config")
+def test_items_bulk_import_logic(mock_load, authenticated_client, mock_db):
+    """Tests the CSV import processing and DB execution."""
+    mock_load.return_value = {"configured": True}
+    # Create a dummy CSV file in memory
+    csv_content = (
+        "inventory_id,name,category,description,serial_number,manufacturer,model\r\n"
+        "TEST-01,Bulk Item,Audio,Testing description,SN-BULK,BrandX,ModY\r\n"
+    )
+    data = {
+        'csv_file': (io.BytesIO(csv_content.encode('utf-8')), 'test_import.csv')
+    }
+    response = authenticated_client.post(
+        "/items/import",
+        data=data,
+        content_type='multipart/form-data',
+        follow_redirects=True
+    )
+    assert response.status_code == 200
+    assert b"Import complete!" in response.data
+    # Verify the database was actually called with the correct data
+    mock_cur = mock_db.cursor.return_value
+    # Check if the execute was called with our "ON DUPLICATE KEY UPDATE" query
+    calls = mock_cur.execute.call_args_list
+    found_import_call = any("INSERT INTO items" in str(call) for call in calls)
+    assert found_import_call is True
