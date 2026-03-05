@@ -1,4 +1,5 @@
 from unittest.mock import patch
+import io
 
 
 @patch("inventory_app.app.load_config")
