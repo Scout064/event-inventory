@@ -1,6 +1,4 @@
-{% extends "base.html" %}
-
-{% block content %}
+{% extends "base.html" %}{% block content %}
 <div class="row justify-content-center">
     <div class="col-md-8 col-lg-6">
         <div class="card shadow-sm mt-4">
@@ -13,7 +11,7 @@
                     
                     <div class="mb-3">
                         {{ form.username.label(class="form-label") }}
-                        {{ form.username(class="form-control" + (" is-invalid" if form.username.errors else "")) }}
+                        {{ form.username(class="form-control" + (" is-invalid" if form.username.errors else ""), maxlength="32") }}
                         {% for error in form.username.errors %}
                             <div class="invalid-feedback">{{ error }}</div>
                         {% endfor %}
@@ -21,7 +19,7 @@
 
                     <div class="mb-3">
                         {{ form.real_name.label(class="form-label") }}
-                        {{ form.real_name(class="form-control" + (" is-invalid" if form.real_name.errors else ""), placeholder="John Doe") }}
+                        {{ form.real_name(class="form-control" + (" is-invalid" if form.real_name.errors else ""), placeholder="John Doe", maxlength="32") }}
                         {% for error in form.real_name.errors %}
                             <div class="invalid-feedback">{{ error }}</div>
                         {% endfor %}
@@ -29,7 +27,7 @@
                     
                     <div class="mb-3">
                         {{ form.email.label(class="form-label") }}
-                        {{ form.email(class="form-control" + (" is-invalid" if form.email.errors else ""), placeholder="name@example.com") }}
+                        {{ form.email(class="form-control" + (" is-invalid" if form.email.errors else ""), placeholder="name@example.com", maxlength="32") }}
                         {% for error in form.email.errors %}
                             <div class="invalid-feedback">{{ error }}</div>
                         {% endfor %}
