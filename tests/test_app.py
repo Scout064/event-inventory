@@ -112,7 +112,7 @@ def test_user_profile_update_success(mock_load, authenticated_client, mock_db):
         follow_redirects=True
     )
     assert response.status_code == 200
-    assert b"Profile updated." in response.data
+    assert b"Profile updated successfully." in response.data
 
 
 @patch("inventory_app.app.load_config")
