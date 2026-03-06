@@ -1,13 +1,19 @@
 {% extends 'base.html' %}
 {% block content %}
 <h3>{{ 'New Item' if mode=='new' else 'Edit Item' }}</h3>
-<form method="post">
+<form method="post" novalidate>
   {{ form.hidden_tag() }}
   <div class="row g-3">
     
     <div class="col-md-4">
       <label class="form-label">Inventory ID</label>
-      {{ form.inventory_id(class="form-control is-invalid" if form.inventory_id.errors else "form-control", maxlength="32", readonly=(mode=='edit')) }}
+      {{ form.inventory_id(
+          class="form-control is-invalid" if form.inventory_id.errors else "form-control", 
+          maxlength="32", 
+          readonly=(mode=='edit'),
+          pattern=".*\\S.*",
+          title="ID cannot be empty or only spaces."
+      ) }}
       {% for error in form.inventory_id.errors %}
         <div class="invalid-feedback">{{ error }}</div>
       {% endfor %}
@@ -15,10 +21,19 @@
 
     <div class="col-md-8">
       <label class="form-label">Name</label>
-      {{ form.name(class="form-control is-invalid" if form.name.errors else "form-control", maxlength="120", pattern=".*\\S.*", title="Must contain at least one visible character") }}
-      {% for error in form.name.errors %}
-        <div class="invalid-feedback">{{ error }}</div>
-      {% endfor %}
+      {{ form.name(
+          class="form-control is-invalid" if form.name.errors else "form-control", 
+          maxlength="120", 
+          pattern=".*\\S.*", 
+          title="Name cannot be empty or only spaces."
+      ) }}
+      {% if form.name.errors %}
+        {% for error in form.name.errors %}
+          <div class="invalid-feedback">{{ error }}</div>
+        {% endfor %}
+      {% else %}
+        <div class="invalid-feedback">Please provide a valid name (not just spaces).</div>
+      {% endif %}
     </div>
 
     <div class="col-md-4">
