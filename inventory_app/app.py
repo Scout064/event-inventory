@@ -515,6 +515,34 @@ def items_download_template():
     )
 
 
+def process_item_row(cur, row):
+    """
+    Helper to process a single CSV row.
+    Returns 1 for success, 2 for duplicate, 3 for other error.
+    """
+    try:
+        cur.execute("""
+            INSERT INTO items (inventory_id, name, category, description,
+                               serial_number, manufacturer, model)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (
+            row['inventory_id'].strip(),
+            row['name'].strip(),
+            row.get('category', '').strip() or None,
+            row.get('description', '').strip() or None,
+            row.get('serial_number', '').strip() or None,
+            row.get('manufacturer', '').strip() or None,
+            row.get('model', '').strip() or None
+        ))
+        return 1  # Success
+    except mariadb.IntegrityError as ie:
+        if ie.errno == 1062:
+            return 2  # Duplicate
+        return 3      # Other DB Error
+    except Exception:
+        return 3      # General Error
+
+
 @app.route("/items/import", methods=["GET", "POST"])
 @login_required
 def items_import():
@@ -528,49 +556,17 @@ def items_import():
         reader = csv.DictReader(stream)
         conn = get_db()
         cur = conn.cursor()
-        success_count = 0
-        duplicate_count = 0
-        error_count = 0
-        try:
-            for row in reader:
-                try:
-                    # We remove 'ON DUPLICATE KEY UPDATE' to prevent silent overwrites
-                    cur.execute("""
-                        INSERT INTO items (inventory_id, name, category, description, serial_number, manufacturer, model)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        row['inventory_id'].strip(),
-                        row['name'].strip(),
-                        row.get('category', '').strip() or None,
-                        row.get('description', '').strip() or None,
-                        row.get('serial_number', '').strip() or None,
-                        row.get('manufacturer', '').strip() or None,
-                        row.get('model', '').strip() or None
-                    ))
-                    success_count += 1
-                except mariadb.IntegrityError as ie:
-                    # Error 1062 is the MariaDB code for Duplicate Entry
-                    if ie.errno == 1062:
-                        duplicate_count += 1
-                    else:
-                        error_count += 1
-                except Exception as e:
-                    error_count += 1
-                    print(f"Row Error: {e}")
-            conn.commit()
-            # Construct the detailed enhancement message
-            msg = f"{success_count} Items Imported, {duplicate_count} not Imported (identical ID)"
-            if error_count > 0:
-                msg += f". Warning: {error_count} other errors occurred."
-            # Use success for imports, but danger/warning if there were many skips
-            category = "success" if duplicate_count == 0 else "warning"
-            flash(msg, category)
-        except Exception as ex:
-            conn.rollback()
-            flash(f"Critical error during import: {ex}", "danger")
-        finally:
-            cur.close()
-            conn.close()
+        counts = {1: 0, 2: 0, 3: 0}  # Success, Duplicate, Error
+        for row in reader:
+            result = process_item_row(cur, row)
+            counts[result] += 1
+        conn.commit()
+        cur.close()
+        conn.close()
+        msg = f"{counts[1]} Items Imported, {counts[2]} not Imported (identical ID)"
+        if counts[3] > 0:
+            msg += f". Warning: {counts[3]} other errors occurred."
+        flash(msg, "success" if counts[2] == 0 and counts[3] == 0 else "warning")
         return redirect(url_for("items"))
     return render_template("items_import.html")
 
