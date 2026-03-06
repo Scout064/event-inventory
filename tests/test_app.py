@@ -65,6 +65,7 @@ def test_items_search_query(mock_load, authenticated_client, mock_db):
     # (Assuming it's the 7-parameter tuple you defined in app.py)
     called_args = mock_cur.execute.call_args[0]
     assert "%Shure%" in called_args[1]
+    assert response.status_code == 200
 
 
 @patch("inventory_app.app.load_config")
@@ -149,7 +150,7 @@ def test_username_validation_rules(mock_load, authenticated_client, mock_db):
     mock_load.return_value = {"configured": True}
     # 1. Test invalid special characters
     response = authenticated_client.post("/profile", data={
-        "username": "User<Script>", # Forbidden characters
+        "username": "User<Script>",  # Forbidden characters
         "submit": "Save Profile"
     })
     assert b"Username contains invalid special characters" in response.data
