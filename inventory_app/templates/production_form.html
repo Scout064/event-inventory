@@ -1,25 +1,62 @@
 {% extends 'base.html' %}
 {% block content %}
-<h3>{{ 'New Production' if mode=='new' else 'Edit Production' }}</h3>
-<form method="post">
-  {{ form.hidden_tag() }}
-  <div class="row g-3">
-    <div class="col-md-6">
-      <label class="form-label">Name</label>
-      {{ form.name(class="form-control") }}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <h3 class="mb-3">{{ 'New Production' if mode=='new' else 'Edit Production' }}</h3>
+        <div class="card p-4 shadow-sm">
+            <form method="post" novalidate>
+                {{ form.hidden_tag() }}
+                <div class="row g-3">
+                    
+                    <div class="col-md-8">
+                        {{ form.name.label(class="form-label") }}
+                        {{ form.name(
+                            class="form-control" + (" is-invalid" if form.name.errors else ""), 
+                            maxlength="64",
+                            pattern=".*\\S.*",
+                            title="Name cannot be empty or only spaces."
+                        ) }}
+                        {% if form.name.errors %}
+                            {% for error in form.name.errors %}
+                                <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="invalid-feedback">Please provide a valid production name.</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-4">
+                        {{ form.date.label(class="form-label") }}
+                        {{ form.date(
+                            class="form-control" + (" is-invalid" if form.date.errors else ""), 
+                            placeholder="YYYY-MM-DD",
+                            maxlength="10"
+                        ) }}
+                        {% for error in form.date.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="col-md-12">
+                        {{ form.notes.label(class="form-label") }}
+                        {{ form.notes(
+                            class="form-control" + (" is-invalid" if form.notes.errors else ""), 
+                            rows="4",
+                            maxlength="500"
+                        ) }}
+                        {% for error in form.notes.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                </div>
+                <hr class="mt-4">
+                <div class="d-flex justify-content-between">
+                    <a class="btn btn-outline-secondary" href="{{ url_for('productions') }}">Cancel</a>
+                    {{ form.submit(class="btn btn-primary") }}
+                </div>
+            </form>
+        </div>
     </div>
-    <div class="col-md-3">
-      <label class="form-label">Date (YYYY-MM-DD)</label>
-      {{ form.date(class="form-control") }}
-    </div>
-    <div class="col-md-12">
-      <label class="form-label">Notes</label>
-      {{ form.notes(class="form-control", rows="4") }}
-    </div>
-  </div>
-  <div class="mt-3">
-    <button class="btn btn-primary">{{ form.submit.label.text }}</button>
-    <a class="btn btn-secondary" href="{{ url_for('productions') }}">Cancel</a>
-  </div>
-</form>
+</div>
 {% endblock %}
