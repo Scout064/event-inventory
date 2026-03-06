@@ -15,8 +15,8 @@ def test_list_items(mock_load, authenticated_client, mock_db):
     response = authenticated_client.get("/items")
     assert response.status_code == 200
     assert b"Shure" in response.data
-    # Verify pagination is showing current page
-    assert b"Showing page 1 of 1" in response.data
+    # VERIFICATION CHANGED: Check the header count instead of hidden pagination
+    assert b"Items (1)" in response.data
 
 
 @patch("inventory_app.app.load_config")
@@ -136,13 +136,15 @@ def test_user_profile_update_success(mock_load, authenticated_client, mock_db):
 @patch("inventory_app.app.load_config")
 def test_profile_update_confirm_required(mock_load, authenticated_client, mock_db):
     mock_load.return_value = {"configured": True}
+    # Deliberately mismatch the passwords
     response = authenticated_client.post("/profile", data={
         "username": "ValidUser",
         "password": "newpassword123",
-        "confirm_password": "newpassword123",
+        "confirm_password": "wrongpassword456",  # Mismatch!
         "submit": "Save Profile"
-    }, follow_redirects=True)
-    assert response.status_code == 200
+    })
+    # Verify the form caught the error
+    assert b"Passwords must match" in response.data
 
 
 @patch("inventory_app.app.load_config")
