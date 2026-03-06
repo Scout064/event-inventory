@@ -229,11 +229,8 @@ class ProductionForm(FlaskForm):
 class UserAdminForm(FlaskForm):
     username = StringField("Username", validators=[DataRequired(), Length(min=3, max=128)])
     password = PasswordField("Password (leave blank to keep current)", validators=[Optional(), Length(min=6)])
-    # Added confirm_password field
-    confirm_password = PasswordField(
-        "Confirm Password",
-        validators=[EqualTo('password', message='Passwords must match')]
-    )
+    # Add this:
+    confirm_password = PasswordField("Confirm Password", validators=[EqualTo('password', message='Passwords must match')])
     is_admin = BooleanField("Grant Admin Privileges")
     submit = SubmitField("Save User")
 
@@ -244,11 +241,8 @@ class UserProfileForm(FlaskForm):
     email = StringField("E-Mail Address", validators=[Optional(), Email(), Length(max=255)])
     birthday = DateField("Birthday", format='%Y-%m-%d', validators=[Optional()])
     password = PasswordField("New Password (leave blank to keep current)", validators=[Optional(), Length(min=6)])
-    # Added confirm_password field
-    confirm_password = PasswordField(
-        "Confirm New Password",
-        validators=[EqualTo('password', message='Passwords must match')]
-    )
+    # Add this:
+    confirm_password = PasswordField("Confirm New Password", validators=[EqualTo('password', message='Passwords must match')])
     submit = SubmitField("Save Profile")
 
 
