@@ -1,0 +1,120 @@
+name: Update Security Policy Versions Table
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  update-security-policy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Allows the bot to push changes back to the repo
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetches all history for all branches and tags
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Generate Supported Versions Table
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm install semver
+          node <<'EOF'
+          const fs = require('fs');
+          const semver = require('semver');
+
+          async function updateSecurityPolicy() {
+            const repo = process.env.GITHUB_REPOSITORY;
+            const token = process.env.GITHUB_TOKEN;
+            
+            // 1. Fetch releases
+            const response = await fetch(`https://api.github.com/repos/${repo}/releases`, {
+              headers: { Authorization: `token ${token}` }
+            });
+            const releases = await response.json();
+
+            if (!Array.isArray(releases) || !releases.length) {
+              console.log("No releases found.");
+              process.exit(0);
+            }
+
+            // 2. Identify Latest Stable per Minor
+            const latestStablePerMinor = {};
+            releases.forEach(rel => {
+              const v = rel.tag_name.replace(/^v/, '');
+              if (semver.valid(v) && !rel.prerelease) {
+                const key = `${semver.major(v)}.${semver.minor(v)}`;
+                if (!latestStablePerMinor[key] || semver.gt(v, latestStablePerMinor[key])) {
+                  latestStablePerMinor[key] = v;
+                }
+              }
+            });
+
+            // 3. Generate Table Rows
+            const tableRows = releases.map(rel => {
+              const v = rel.tag_name.replace(/^v/, '');
+              let status = '❌';
+
+              if (semver.valid(v) && !rel.prerelease) {
+                const key = `${semver.major(v)}.${semver.minor(v)}`;
+                if (latestStablePerMinor[key] === v) status = '✅';
+              }
+              return `| ${rel.tag_name} | ${status} |`;
+            }).join('\n');
+
+            // 4. Reconstruct SECURITY.md
+            const securityContent = `# Security Policy
+
+            ## Supported Versions
+
+            | Version | Supported          |
+            | ------- | ------------------ |
+            ${tableRows}
+
+            ## Reporting a Vulnerability
+
+            Please report any security issues to [security@example.com](mailto:security@example.com).  
+            You will receive acknowledgment within 48 hours. Accepted reports will be fixed promptly and credited. Declined reports will include reasoning.`;
+
+            fs.writeFileSync('SECURITY.md', securityContent, 'utf8');
+            console.log("SECURITY.md has been reformatted and updated.");
+          }
+
+          updateSecurityPolicy();
+          EOF
+
+      - name: Commit and Push Changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          git add SECURITY.md
+          
+          # Check if there are changes to avoid failing on 'nothing to commit'
+          if git diff --staged --quiet; then
+            echo "No changes detected in SECURITY.md. Skipping push."
+            exit 0
+          fi
+
+          git commit -m "chore: update supported versions table"
+
+          # Sync and Push to main
+          git pull --rebase origin main
+          git push origin HEAD:main
+
+          # Sync and Push to Beta
+          git pull --rebase origin Beta
+          git push origin HEAD:Beta
+
+          # Sync and Push to Beta
+          git pull --rebase origin Alpha
+          git push origin HEAD:Alpha
