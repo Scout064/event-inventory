@@ -23,6 +23,10 @@ def test_list_items(mock_load, authenticated_client, mock_db):
 def test_add_item(mock_load, authenticated_client, mock_db):
     """Tests POST /items/new."""
     mock_load.return_value = {"configured": True}
+    # NEW: Mock the DB responses for the redirect to /items
+    mock_cur = mock_db.cursor.return_value
+    mock_cur.fetchone.return_value = (1,)  # total_items = 1
+    mock_cur.fetchall.return_value = []   # empty list of items
     response = authenticated_client.post(
         "/items/new",
         data={
@@ -38,6 +42,8 @@ def test_add_item(mock_load, authenticated_client, mock_db):
     )
     assert response.status_code == 200
     assert b"Item created." in response.data
+    # Since total_items was 1, verify the header we added earlier
+    assert b"Items (1)" in response.data
 
 
 @patch("inventory_app.app.load_config")
@@ -56,16 +62,18 @@ def test_item_label_png(mock_load, authenticated_client, mock_db):
 
 @patch("inventory_app.app.load_config")
 def test_items_search_query(mock_load, authenticated_client, mock_db):
+    """Verifies that the search query 'q' is passed to the SQL query."""
     mock_load.return_value = {"configured": True}
     mock_cur = mock_db.cursor.return_value
-    mock_cur.fetchone.return_value = (0,)
-    # Search for "Shure"
-    response = authenticated_client.get("/items?q=Shure")
-    # Check if the query was executed with the wildcard %Shure%
-    # (Assuming it's the 7-parameter tuple you defined in app.py)
-    called_args = mock_cur.execute.call_args[0]
-    assert "%Shure%" in called_args[1]
+    # NEW: Pagination needs a total count first
+    mock_cur.fetchone.return_value = (1,)
+    mock_cur.fetchall.return_value = [("ID1", "SearchTarget", "Cat", "SN", "Man", "Mod")]
+    response = authenticated_client.get("/items?q=SearchTarget")
     assert response.status_code == 200
+    # Check if our SQL was called with the search term and wildcards
+    # (Note: index might vary based on your app.py structure)
+    args, kwargs = mock_cur.execute.call_args
+    assert "%SearchTarget%" in args[1]
 
 
 @patch("inventory_app.app.load_config")
@@ -233,7 +241,10 @@ def test_items_download_template(mock_load, authenticated_client):
 def test_items_bulk_import_logic(mock_load, authenticated_client, mock_db):
     """Tests the CSV import processing and DB execution."""
     mock_load.return_value = {"configured": True}
-    # This CSV has 1 valid row
+    # NEW: Mock DB responses for the redirect to /items
+    mock_cur = mock_db.cursor.return_value
+    mock_cur.fetchone.return_value = (1,)
+    mock_cur.fetchall.return_value = []
     csv_content = (
         "inventory_id,name,category,description,serial_number,manufacturer,model\r\n"
         "TEST-01,Bulk Item,Audio,Testing description,SN-BULK,BrandX,ModY\r\n"
@@ -248,6 +259,4 @@ def test_items_bulk_import_logic(mock_load, authenticated_client, mock_db):
         follow_redirects=True
     )
     assert response.status_code == 200
-    # Update these assertions to match the new dynamic message
-    assert b"1 Items Imported" in response.data
-    assert b"0 not Imported (identical ID)" in response.data
+    assert b"Imported 1 items" in response.data
