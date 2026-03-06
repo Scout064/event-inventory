@@ -259,4 +259,4 @@ def test_items_bulk_import_logic(mock_load, authenticated_client, mock_db):
         follow_redirects=True
     )
     assert response.status_code == 200
-    assert b"Imported 1 items" in response.data
+    assert b"1 Items Imported, 0 not Imported (identical ID)" in response.data
