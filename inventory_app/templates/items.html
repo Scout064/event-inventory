@@ -54,8 +54,8 @@
         <td>{{ r[4] or '' }}</td>
         <td>{{ r[5] or '' }}</td>
         <td class="text-end">
-          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('items_edit', iid=r[0]) }}">Edit</a>
-          <a class="btn btn-sm btn-outline-info" href="{{ url_for('item_label_pdf', iid=r[0]) }}" target="_blank">PDF</a>
+          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('items_edit', inventory_id=r[0]) }}">Edit</a>
+          <a class="btn btn-sm btn-outline-info" href="{{ url_for('item_label_pdf', inventory_id=r[0]) }}" target="_blank">PDF</a>
         </td>
       </tr>
       {% else %}
