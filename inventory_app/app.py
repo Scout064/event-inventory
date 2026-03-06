@@ -427,25 +427,42 @@ def index():
 @app.route('/items')
 @login_required
 def items():
-    # Get current page from URL (default to 1)
+    # 1. Get parameters from the URL
     page = request.args.get('page', 1, type=int)
+    q = request.args.get('q', '').strip()
     per_page = 100
     offset = (page - 1) * per_page
     conn = get_db()
     cur = conn.cursor()
-    # 1. Get the total count of items to calculate total pages
-    cur.execute("SELECT COUNT(*) FROM items")
+    # 2. Build the search condition
+    search_wildcard = f"%{q}%"
+    where_clause = ""
+    params = []
+    if q:
+        where_clause = """
+            WHERE inventory_id LIKE %s
+               OR name LIKE %s
+               OR category LIKE %s
+               OR serial_number LIKE %s
+               OR manufacturer LIKE %s
+               OR model LIKE %s
+               OR description LIKE %s
+        """
+        params = [search_wildcard] * 7
+    # 3. Get total count for this search (for pagination)
+    cur.execute(f"SELECT COUNT(*) FROM items {where_clause}", tuple(params))
     total_items = cur.fetchone()[0]
-    total_pages = (total_items + per_page - 1) // per_page  # Ceiling division
-    # 2. Fetch only the 100 items for the current page
-    # Note: Added an ORDER BY to ensure consistent paging
-    query = """
+    total_pages = (total_items + per_page - 1) // per_page
+    # 4. Fetch the specific page of data
+    # We order by inventory_id to ensure a stable sequence across pages
+    query = f"""
         SELECT inventory_id, name, category, serial_number, manufacturer, model
         FROM items
+        {where_clause}
         ORDER BY inventory_id ASC
         LIMIT %s OFFSET %s
     """
-    cur.execute(query, (per_page, offset))
+    cur.execute(query, tuple(params + [per_page, offset]))
     rows = cur.fetchall()
     cur.close()
     conn.close()
@@ -454,7 +471,8 @@ def items():
         rows=rows,
         page=page,
         total_pages=total_pages,
-        total_items=total_items
+        total_items=total_items,
+        q=q
     )
 
 
