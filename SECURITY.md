@@ -1,21 +1,31 @@
 # Security Policy
 
-## Supported Versions
+  ## Supported Versions
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+  | Version | Supported          |
+  | ------- | ------------------ |
+  | v1.1.1-beta.9 | ❌ |
+| v1.1.1-beta.8 | ❌ |
+| v1.1.1-beta.7 | ❌ |
+| v1.1.1-beta.6 | ❌ |
+| v1.1.1-beta.5 | ❌ |
+| v1.1.1-beta.4 | ❌ |
+| v1.1.1-beta.3 | ❌ |
+| v1.1.1-beta.2 | ❌ |
+| v1.1.1-beta.1 | ❌ |
+| v1.1.1-beta.0 | ❌ |
+| v1.1.0 | ✅ |
+| v1.1.0-beta.3 | ❌ |
+| v1.1.0-beta.2 | ❌ |
+| v1.1.0-beta.1 | ❌ |
+| v1.1.0-beta.0 | ❌ |
+| v1.0.0 | ✅ |
+| v0.1.3 | ❌ |
+| v0.1.2 | ❌ |
+| v0.1.1 | ❌ |
+| v0.1.0 | ❌ |
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+  ## Reporting a Vulnerability
 
-## Reporting a Vulnerability
-
-Use this section to tell people how to report a vulnerability.
-
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+  Please report any security issues to [security@example.com](mailto:security@example.com).  
+  You will receive acknowledgment within 48 hours. Accepted reports will be fixed promptly and credited. Declined reports will include reasoning.
