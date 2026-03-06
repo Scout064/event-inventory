@@ -197,8 +197,8 @@ class LoginForm(FlaskForm):
 
 
 class ItemForm(FlaskForm):
-    inventory_id = StringField("Inventory ID", validators=[DataRequired(), Length(min=1, max=32)])
-    name = StringField("Name", validators=[DataRequired(), Length(min=1, max=120)])
+    inventory_id = StringField("Inventory ID", validators=[DataRequired(message="ID is required and cannot be blank"), Length(min=1, max=32)])
+    name = StringField("Name", validators=[DataRequired(message="Name is required and cannot be blank"), Length(min=1, max=120)])
     category = StringField("Category", validators=[Optional(), Length(max=50)])
     description = TextAreaField("Description", validators=[Optional(), Length(max=250)])
     serial_number = StringField("Serial Number", validators=[Optional(), Length(max=50)])
