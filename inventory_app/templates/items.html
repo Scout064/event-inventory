@@ -47,7 +47,7 @@
     <tbody id="itemTableBody">
       {% for r in rows %}
       <tr>
-        <td><a href="{{ url_for('items_view', iid=r[0]) }}" class="text-decoration-none fw-bold">{{ r[0] }}</a></td>
+        <td><a href="{{ url_for('item_view', iid=r[0]) }}" class="text-decoration-none fw-bold">{{ r[0] }}</a></td>
         <td>{{ r[1] }}</td>
         <td><span class="badge bg-light text-dark">{{ r[2] or '' }}</span></td>
         <td>{{ r[3] or '' }}</td>
