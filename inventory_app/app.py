@@ -197,13 +197,13 @@ class LoginForm(FlaskForm):
 
 
 class ItemForm(FlaskForm):
-    inventory_id = StringField("Inventory ID", validators=[DataRequired(), Length(min=1, max=64)])
-    name = StringField("Name", validators=[DataRequired(), Length(min=1, max=255)])
-    category = StringField("Category", validators=[Optional(), Length(max=128)])
-    description = TextAreaField("Description", validators=[Optional()])
-    serial_number = StringField("Serial Number", validators=[Optional(), Length(max=128)])
-    manufacturer = StringField("Manufacturer", validators=[Optional(), Length(max=128)])
-    model = StringField("Model", validators=[Optional(), Length(max=128)])
+    inventory_id = StringField("Inventory ID", validators=[DataRequired(), Length(min=1, max=32)])
+    name = StringField("Name", validators=[DataRequired(), Length(min=1, max=120)])
+    category = StringField("Category", validators=[Optional(), Length(max=50)])
+    description = TextAreaField("Description", validators=[Optional(), Length(max=250)])
+    serial_number = StringField("Serial Number", validators=[Optional(), Length(max=50)])
+    manufacturer = StringField("Manufacturer", validators=[Optional(), Length(max=50)])
+    model = StringField("Model", validators=[Optional(), Length(max=50)])
     submit = SubmitField("Save")
 
 
