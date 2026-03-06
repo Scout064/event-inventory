@@ -41,7 +41,7 @@ fi
 echo "--- Installing Dependencies ---"
 apt-get update
 
-CORE_DEPS=("mariadb-server" "mariadb-client" "python3" "python3-pip" "python3-venv" "apache2" "libapache2-mod-wsgi-py3" "rsync" "libmariadb-dev" "libmariadb-dev-compat")
+CORE_DEPS=("mariadb-server" "mariadb-client" "python3" "python3-pip" "python3-venv" "apache2" "libapache2-mod-wsgi-py3" "rsync" "libmariadb-dev" "libmariadb-dev-compat" "fonts-dejavu-core")
 for pkg in "${CORE_DEPS[@]}"; do
     apt-get install -y "$pkg"
 done
@@ -102,14 +102,11 @@ EOF
 # Setup Virtual Environment
 cd "$APP_DIR"
 python3 -m venv venv
-./venv/bin/pip install flask flask-login flask-wtf pillow qrcode reportlab mariadb
+./venv/bin/pip install -r requirements.txt
 
-# Apply initial schema
+# Apply Schema & Migrations
+echo "Applying base schema and checking migrations..."
 mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$APP_DIR/schema.sql"
-
-# Set Permissions
-chown -R www-data:www-data "$APP_DIR"
-chmod -R 750 "$APP_DIR"
 
 # ---------------------------------------------------------
 # 5. Apache Configuration
@@ -123,6 +120,10 @@ if [[ "$USE_REVERSE_PROXY" =~ ^[Yy]$ ]]; then
     tee "$VHOST_CONF" > /dev/null <<EOF
 <VirtualHost *:80>
     ServerName $SERVER_NAME
+
+    ErrorLog \${APACHE_LOG_DIR}/inventory_error.log
+    CustomLog \${APACHE_LOG_DIR}/inventory_access.log combined
+
     WSGIDaemonProcess inventory_app python-home=$APP_DIR/venv python-path=$APP_DIR
     WSGIScriptAlias / $APP_DIR/wsgi.py
     <Directory $APP_DIR>
@@ -142,11 +143,14 @@ else
     fi
 
     tee "$VHOST_CONF" > /dev/null <<EOF
-# Redirect Global traffic to HTTPS, Allow LAN on HTTP
 <VirtualHost *:80>
     ServerName $SERVER_NAME
+    
+    ErrorLog \${APACHE_LOG_DIR}/inventory_error.log
+    CustomLog \${APACHE_LOG_DIR}/inventory_access.log combined
+
     RewriteEngine On
-    # Allow 192.168.0.0/16 to stay on HTTP
+    # Allow local LAN (192.168.x.x) to stay on HTTP
     RewriteCond %{REMOTE_ADDR} !^192\.168\.
     RewriteRule ^/(.*)$ https://%{HTTP_HOST}/\$1 [R=301,L]
 
@@ -160,6 +164,10 @@ else
 
 <VirtualHost *:443>
     ServerName $SERVER_NAME
+
+    ErrorLog \${APACHE_LOG_DIR}/inventory_error.log
+    CustomLog \${APACHE_LOG_DIR}/inventory_access.log combined
+
     SSLEngine on
     SSLCertificateFile $CERT_FILE
     SSLCertificateKeyFile $KEY_FILE
@@ -174,11 +182,16 @@ else
 EOF
 fi
 
+# Set Permissions (Must happen after files are synced)
+chown -R www-data:www-data "$APP_DIR"
+chmod -R 750 "$APP_DIR"
+
 a2ensite inventory.conf
 a2dissite 000-default.conf || true
 systemctl restart apache2
 
 echo "========================================================="
 echo "✅ Installation complete!"
-echo "URL: http://$SERVER_NAME (or https if SSL enabled)"
+echo "URL: http://$SERVER_NAME"
+echo "Log Location: /var/log/apache2/inventory_error.log"
 echo "========================================================="
