@@ -4,21 +4,29 @@ import io
 
 @patch("inventory_app.app.load_config")
 def test_list_items(mock_load, authenticated_client, mock_db):
-    """Tests GET /items with a pre-logged in user."""
     mock_load.return_value = {"configured": True}
     mock_cur = mock_db.cursor.return_value
+    # First call: COUNT(*) fetchone()
+    # Second call: rows fetchall()
+    mock_cur.fetchone.return_value = (1,)
     mock_cur.fetchall.return_value = [
         ("ID1", "Mic", "Audio", "SN1", "Shure", "SM58")
     ]
     response = authenticated_client.get("/items")
     assert response.status_code == 200
     assert b"Shure" in response.data
+    # VERIFICATION CHANGED: Check the header count instead of hidden pagination
+    assert b"Items (1)" in response.data
 
 
 @patch("inventory_app.app.load_config")
 def test_add_item(mock_load, authenticated_client, mock_db):
     """Tests POST /items/new."""
     mock_load.return_value = {"configured": True}
+    # NEW: Mock the DB responses for the redirect to /items
+    mock_cur = mock_db.cursor.return_value
+    mock_cur.fetchone.return_value = (1,)  # total_items = 1
+    mock_cur.fetchall.return_value = []   # empty list of items
     response = authenticated_client.post(
         "/items/new",
         data={
@@ -34,6 +42,8 @@ def test_add_item(mock_load, authenticated_client, mock_db):
     )
     assert response.status_code == 200
     assert b"Item created." in response.data
+    # Since total_items was 1, verify the header we added earlier
+    assert b"Items (1)" in response.data
 
 
 @patch("inventory_app.app.load_config")
@@ -48,6 +58,22 @@ def test_item_label_png(mock_load, authenticated_client, mock_db):
     assert response.status_code == 200
     assert response.mimetype == "image/png"
     assert len(response.data) > 0
+
+
+@patch("inventory_app.app.load_config")
+def test_items_search_query(mock_load, authenticated_client, mock_db):
+    """Verifies that the search query 'q' is passed to the SQL query."""
+    mock_load.return_value = {"configured": True}
+    mock_cur = mock_db.cursor.return_value
+    # NEW: Pagination needs a total count first
+    mock_cur.fetchone.return_value = (1,)
+    mock_cur.fetchall.return_value = [("ID1", "SearchTarget", "Cat", "SN", "Man", "Mod")]
+    response = authenticated_client.get("/items?q=SearchTarget")
+    assert response.status_code == 200
+    # Check if our SQL was called with the search term and wildcards
+    # (Note: index might vary based on your app.py structure)
+    args, kwargs = mock_cur.execute.call_args
+    assert "%SearchTarget%" in args[1]
 
 
 @patch("inventory_app.app.load_config")
@@ -116,6 +142,45 @@ def test_user_profile_update_success(mock_load, authenticated_client, mock_db):
 
 
 @patch("inventory_app.app.load_config")
+def test_profile_update_confirm_required(mock_load, authenticated_client, mock_db):
+    mock_load.return_value = {"configured": True}
+    # Deliberately mismatch the passwords
+    response = authenticated_client.post("/profile", data={
+        "username": "ValidUser",
+        "password": "newpassword123",
+        "confirm_password": "wrongpassword456",  # Mismatch!
+        "submit": "Save Profile"
+    })
+    # Verify the form caught the error
+    assert b"Passwords must match" in response.data
+
+
+@patch("inventory_app.app.load_config")
+def test_username_validation_rules(mock_load, authenticated_client, mock_db):
+    mock_load.return_value = {"configured": True}
+    # 1. Test invalid special characters
+    response = authenticated_client.post("/profile", data={
+        "username": "User<Script>",  # Forbidden characters
+        "submit": "Save Profile"
+    })
+    assert b"Username contains invalid special characters" in response.data
+    # 2. Test length limit (33 chars)
+    long_username = "A" * 33
+    response = authenticated_client.post("/profile", data={
+        "username": long_username,
+        "submit": "Save Profile"
+    })
+    assert b"Username must be between 3 and 32 characters" in response.data
+    # 3. Test allowed language-specific characters (Should PASS)
+    response = authenticated_client.post("/profile", data={
+        "username": "Müller_éè",
+        "submit": "Save Profile"
+    })
+    # If the regex works, it won't show the error message
+    assert b"Username contains invalid special characters" not in response.data
+
+
+@patch("inventory_app.app.load_config")
 def test_admin_add_user_success(mock_load, authenticated_client, mock_db):
     """Tests the Admin's ability to create a new user with password confirmation."""
     mock_load.return_value = {"configured": True}
@@ -176,7 +241,10 @@ def test_items_download_template(mock_load, authenticated_client):
 def test_items_bulk_import_logic(mock_load, authenticated_client, mock_db):
     """Tests the CSV import processing and DB execution."""
     mock_load.return_value = {"configured": True}
-    # This CSV has 1 valid row
+    # NEW: Mock DB responses for the redirect to /items
+    mock_cur = mock_db.cursor.return_value
+    mock_cur.fetchone.return_value = (1,)
+    mock_cur.fetchall.return_value = []
     csv_content = (
         "inventory_id,name,category,description,serial_number,manufacturer,model\r\n"
         "TEST-01,Bulk Item,Audio,Testing description,SN-BULK,BrandX,ModY\r\n"
@@ -191,6 +259,4 @@ def test_items_bulk_import_logic(mock_load, authenticated_client, mock_db):
         follow_redirects=True
     )
     assert response.status_code == 200
-    # Update these assertions to match the new dynamic message
-    assert b"1 Items Imported" in response.data
-    assert b"0 not Imported (identical ID)" in response.data
+    assert b"1 Items Imported, 0 not Imported (identical ID)" in response.data

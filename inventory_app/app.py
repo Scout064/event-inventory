@@ -20,7 +20,10 @@ from wtforms import (
     StringField, PasswordField, SubmitField, BooleanField,
     TextAreaField, FileField, DateField
 )
-from wtforms.validators import DataRequired, Length, Optional, Email, EqualTo
+from wtforms.validators import (
+    DataRequired, Length, Optional, Email,
+    EqualTo, Regexp
+)
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from reportlab.lib.pagesizes import A4
@@ -220,28 +223,62 @@ class ItemForm(FlaskForm):
 
 
 class ProductionForm(FlaskForm):
-    name = StringField("Name", validators=[DataRequired(), Length(min=1, max=255)])
+    name = StringField(
+        "Name",
+        validators=[
+            DataRequired(message="Production name is required"),
+            Length(min=1, max=64, message="Name must be between 1 and 64 characters")
+        ]
+    )
     date = StringField("Date (YYYY-MM-DD)", validators=[Optional()])
-    notes = TextAreaField("Notes", validators=[Optional()])
+    notes = TextAreaField("Notes", validators=[Optional(), Length(max=500, message="Notes cannot exceed 500 characters")])
     submit = SubmitField("Save")
 
 
 class UserAdminForm(FlaskForm):
-    username = StringField("Username", validators=[DataRequired(), Length(min=3, max=128)])
+    username = StringField(
+        "Username",
+        validators=[
+            DataRequired(),
+            Length(min=3, max=32, message="Username must be between 3 and 32 characters."),
+            # Allows letters, numbers, specific language characters, dots, hyphens, and underscores
+            Regexp(r'^[a-zA-Z0-9äöüÄÖÜßéèêáàâíìîóòôúùûñÑçÇ._\-]+$', message="Username contains invalid special characters.")
+        ]
+    )
     password = PasswordField("Password (leave blank to keep current)", validators=[Optional(), Length(min=6)])
-    # Add this:
     confirm_password = PasswordField("Confirm Password", validators=[EqualTo('password', message='Passwords must match')])
     is_admin = BooleanField("Grant Admin Privileges")
     submit = SubmitField("Save User")
 
 
 class UserProfileForm(FlaskForm):
-    username = StringField("Username", validators=[DataRequired(), Length(min=3, max=128)])
-    real_name = StringField("Real Name", validators=[Optional(), Length(max=255)])
-    email = StringField("E-Mail Address", validators=[Optional(), Email(), Length(max=255)])
+    username = StringField(
+        "Username",
+        validators=[
+            DataRequired(),
+            Length(min=3, max=32, message="Username must be between 3 and 32 characters."),
+            Regexp(r'^[a-zA-Z0-9äöüÄÖÜßéèêáàâíìîóòôúùûñÑçÇ._\-]+$', message="Username contains invalid special characters.")
+        ]
+    )
+    real_name = StringField(
+        "Real Name",
+        validators=[
+            Optional(),
+            Length(max=32, message="Real name cannot exceed 32 characters."),
+            # Same as above but allows spaces
+            Regexp(r'^[a-zA-Z0-9äöüÄÖÜßéèêáàâíìîóòôúùûñÑçÇ\s.\-]+$', message="Real name contains invalid special characters.")
+        ]
+    )
+    email = StringField(
+        "E-Mail Address",
+        validators=[
+            Optional(),
+            Email(),
+            Length(max=32, message="Email cannot exceed 32 characters.")
+        ]
+    )
     birthday = DateField("Birthday", format='%Y-%m-%d', validators=[Optional()])
     password = PasswordField("New Password (leave blank to keep current)", validators=[Optional(), Length(min=6)])
-    # Add this:
     confirm_password = PasswordField("Confirm New Password", validators=[EqualTo('password', message='Passwords must match')])
     submit = SubmitField("Save Profile")
 
@@ -386,16 +423,57 @@ def index():
 
 
 # Items
-@app.route("/items")
+# In app.py - Update the items route
+@app.route('/items')
 @login_required
 def items():
+    # 1. Get parameters from the URL
+    page = request.args.get('page', 1, type=int)
+    q = request.args.get('q', '').strip()
+    per_page = 100
+    offset = (page - 1) * per_page
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT inventory_id, name, category, serial_number, manufacturer, model FROM items ORDER BY name")
+    # 2. Build the search condition
+    search_wildcard = f"%{q}%"
+    where_clause = ""
+    params = []
+    if q:
+        where_clause = """
+            WHERE inventory_id LIKE %s
+               OR name LIKE %s
+               OR category LIKE %s
+               OR serial_number LIKE %s
+               OR manufacturer LIKE %s
+               OR model LIKE %s
+               OR description LIKE %s
+        """
+        params = [search_wildcard] * 7
+    # 3. Get total count for this search (for pagination)
+    cur.execute(f"SELECT COUNT(*) FROM items {where_clause}", tuple(params))
+    total_items = cur.fetchone()[0]
+    total_pages = (total_items + per_page - 1) // per_page
+    # 4. Fetch the specific page of data
+    # We order by inventory_id to ensure a stable sequence across pages
+    query = f"""
+        SELECT inventory_id, name, category, serial_number, manufacturer, model
+        FROM items
+        {where_clause}
+        ORDER BY inventory_id ASC
+        LIMIT %s OFFSET %s
+    """
+    cur.execute(query, tuple(params + [per_page, offset]))
     rows = cur.fetchall()
     cur.close()
     conn.close()
-    return render_template("items.html", rows=rows)
+    return render_template(
+        "items.html",
+        rows=rows,
+        page=page,
+        total_pages=total_pages,
+        total_items=total_items,
+        q=q
+    )
 
 
 @app.route("/items/new", methods=["GET", "POST"])
