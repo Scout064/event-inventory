@@ -4,34 +4,63 @@
 <form method="post">
   {{ form.hidden_tag() }}
   <div class="row g-3">
+    
     <div class="col-md-4">
       <label class="form-label">Inventory ID</label>
-      {{ form.inventory_id(class="form-control", maxlength="32", readonly=(mode=='edit')) }}
+      {{ form.inventory_id(class="form-control is-invalid" if form.inventory_id.errors else "form-control", maxlength="32", readonly=(mode=='edit')) }}
+      {% for error in form.inventory_id.errors %}
+        <div class="invalid-feedback">{{ error }}</div>
+      {% endfor %}
     </div>
+
     <div class="col-md-8">
       <label class="form-label">Name</label>
-      {{ form.name(class="form-control", maxlength="120") }}
+      {{ form.name(class="form-control is-invalid" if form.name.errors else "form-control", maxlength="120", pattern=".*\\S.*", title="Must contain at least one visible character") }}
+      {% for error in form.name.errors %}
+        <div class="invalid-feedback">{{ error }}</div>
+      {% endfor %}
     </div>
+
     <div class="col-md-4">
       <label class="form-label">Category</label>
-      {{ form.category(class="form-control", maxlength="50") }}
+      {{ form.category(class="form-control is-invalid" if form.category.errors else "form-control", maxlength="50") }}
+      {% for error in form.category.errors %}
+        <div class="invalid-feedback">{{ error }}</div>
+      {% endfor %}
     </div>
+
     <div class="col-md-4">
       <label class="form-label">Manufacturer</label>
-      {{ form.manufacturer(class="form-control", maxlength="50") }}
+      {{ form.manufacturer(class="form-control is-invalid" if form.manufacturer.errors else "form-control", maxlength="50") }}
+      {% for error in form.manufacturer.errors %}
+        <div class="invalid-feedback">{{ error }}</div>
+      {% endfor %}
     </div>
+
     <div class="col-md-4">
       <label class="form-label">Model</label>
-      {{ form.model(class="form-control", maxlength="50") }}
+      {{ form.model(class="form-control is-invalid" if form.model.errors else "form-control", maxlength="50") }}
+      {% for error in form.model.errors %}
+        <div class="invalid-feedback">{{ error }}</div>
+      {% endfor %}
     </div>
+
     <div class="col-md-6">
       <label class="form-label">Serial Number</label>
-      {{ form.serial_number(class="form-control", maxlength="50") }}
+      {{ form.serial_number(class="form-control is-invalid" if form.serial_number.errors else "form-control", maxlength="50") }}
+      {% for error in form.serial_number.errors %}
+        <div class="invalid-feedback">{{ error }}</div>
+      {% endfor %}
     </div>
+
     <div class="col-md-12">
       <label class="form-label">Description</label>
-      {{ form.description(class="form-control", maxlength="250", rows="4") }}
+      {{ form.description(class="form-control is-invalid" if form.description.errors else "form-control", maxlength="250", rows="4") }}
+      {% for error in form.description.errors %}
+        <div class="invalid-feedback">{{ error }}</div>
+      {% endfor %}
     </div>
+
   </div>
   <div class="mt-3">
     <button class="btn btn-primary">{{ form.submit.label.text }}</button>
