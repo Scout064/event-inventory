@@ -1,23 +1,24 @@
 {% extends 'base.html' %}
 {% block content %}
 <style>
-  /* Visual feedback: show headers are clickable */
   th.sortable { cursor: pointer; position: relative; }
   th.sortable:hover { background-color: #f8f9fa; }
-  th.sortable::after {
-    content: ' \21C5'; /* Up/Down arrow symbol */
-    opacity: 0.3;
-    font-size: 0.8em;
-  }
+  th.sortable::after { content: ' \21C5'; opacity: 0.3; font-size: 0.8em; }
 </style>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h3>Items</h3>
+  <h3>Items ({{ total_items }})</h3>
   <div class="d-flex gap-2">
-    <input type="text" id="itemFilter" class="form-control" placeholder="Search items...">
+    <form action="{{ url_for('items') }}" method="get" class="d-flex gap-2">
+      <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Search all items..." style="width: 250px;">
+      <button type="submit" class="btn btn-outline-primary">Search</button>
+      {% if q %}
+        <a href="{{ url_for('items') }}" class="btn btn-outline-secondary">Clear</a>
+      {% endif %}
+    </form>
     
     <div class="dropdown">
-      <button class="btn btn-outline-secondary dropdown-toggle text-nowrap" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+      <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
         Bulk Actions
       </button>
       <ul class="dropdown-menu dropdown-menu-end">
@@ -26,25 +27,81 @@
         <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#importModal">Import from CSV</a></li>
       </ul>
     </div>
-
     <a class="btn btn-primary text-nowrap" href="{{ url_for('items_new') }}">Add Item</a>
   </div>
 </div>
 
-<div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-hidden="true">
+<div class="card shadow-sm">
+  <table class="table table-hover mb-0" id="inventoryTable">
+    <thead class="table-light">
+      <tr>
+        <th class="sortable" onclick="sortTable(0)">ID</th>
+        <th class="sortable" onclick="sortTable(1)">Name</th>
+        <th class="sortable" onclick="sortTable(2)">Category</th>
+        <th class="sortable" onclick="sortTable(3)">Serial</th>
+        <th class="sortable" onclick="sortTable(4)">Manufacturer</th>
+        <th class="sortable" onclick="sortTable(5)">Model</th>
+        <th class="text-end">Actions</th>
+      </tr>
+    </thead>
+    <tbody id="itemTableBody">
+      {% for r in rows %}
+      <tr>
+        <td><a href="{{ url_for('items_view', iid=r[0]) }}" class="text-decoration-none fw-bold">{{ r[0] }}</a></td>
+        <td>{{ r[1] }}</td>
+        <td><span class="badge bg-light text-dark">{{ r[2] or '' }}</span></td>
+        <td>{{ r[3] or '' }}</td>
+        <td>{{ r[4] or '' }}</td>
+        <td>{{ r[5] or '' }}</td>
+        <td class="text-end">
+          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('items_edit', iid=r[0]) }}">Edit</a>
+          <a class="btn btn-sm btn-outline-info" href="{{ url_for('item_label_pdf', iid=r[0]) }}" target="_blank">PDF</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="7" class="text-center py-4 text-muted">No items found matching your criteria.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if total_pages > 1 %}
+<nav aria-label="Item navigation" class="mt-4">
+  <ul class="pagination justify-content-center">
+    <li class="page-item {{ 'disabled' if page <= 1 }}">
+      <a class="page-link" href="{{ url_for('items', page=page-1, q=q) if page > 1 else '#' }}">Previous</a>
+    </li>
+
+    {% for p in range(1, total_pages + 1) %}
+      {% if p == page %}
+        <li class="page-item active"><span class="page-link">{{ p }}</span></li>
+      {% elif p > page - 3 and p < page + 3 or p == 1 or p == total_pages %}
+        <li class="page-item"><a class="page-link" href="{{ url_for('items', page=p, q=q) }}">{{ p }}</a></li>
+      {% elif p == page - 3 or p == page + 3 %}
+        <li class="page-item disabled"><span class="page-link">...</span></li>
+      {% endif %}
+    {% endfor %}
+
+    <li class="page-item {{ 'disabled' if page >= total_pages }}">
+      <a class="page-link" href="{{ url_for('items', page=page+1, q=q) if page < total_pages else '#' }}">Next</a>
+    </li>
+  </ul>
+</nav>
+{% endif %}
+
+<div class="modal fade" id="importModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="importModalLabel">Bulk Import Items</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <form action="{{ url_for('items_import') }}" method="post" enctype="multipart/form-data">
+      <form action="{{ url_for('items_bulk_import') }}" method="POST" enctype="multipart/form-data">
+        <div class="modal-header">
+          <h5 class="modal-title">Bulk Import Items</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
         <div class="modal-body">
-          <p class="text-muted small">Upload a CSV file using the standard template. Existing Inventory IDs will be updated with the new values provided in the file.</p>
-          <div class="mb-3">
-            <label class="form-label">Select CSV File</label>
-            <input type="file" name="csv_file" class="form-control" accept=".csv" required>
-          </div>
+          <p class="small text-muted">Upload a CSV file. Use the "Download CSV Template" option to see the required format.</p>
+          <input type="file" name="csv_file" class="form-control" accept=".csv" required>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -55,93 +112,23 @@
   </div>
 </div>
 
-<table class="table table-striped table-sm" id="inventoryTable">
-  <thead>
-    <tr>
-      <th class="sortable" onclick="sortTable(0)">ID</th>
-      <th class="sortable" onclick="sortTable(1)">Name</th>
-      <th class="sortable" onclick="sortTable(2)">Category</th>
-      <th class="sortable" onclick="sortTable(3)">Serial</th>
-      <th class="sortable" onclick="sortTable(4)">Manufacturer</th>
-      <th class="sortable" onclick="sortTable(5)">Model</th>
-      <th></th> 
-    </tr>
-  </thead>
-  <tbody id="itemTableBody">
-  {% for r in rows %}
-    <tr>
-      <td><a href="{{ url_for('label_png', inventory_id=r[0]) }}" target="_blank">{{ r[0] }}</a></td>
-      <td>{{ r[1] }}</td>
-      <td>{{ r[2] or '' }}</td>
-      <td>{{ r[3] or '' }}</td>
-      <td>{{ r[4] or '' }}</td>
-      <td>{{ r[5] or '' }}</td>
-      <td class="text-end">
-        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('items_edit', inventory_id=r[0]) }}">Edit</a>
-        <form action="{{ url_for('items_delete', inventory_id=r[0]) }}" method="post" style="display:inline" onsubmit="return confirm('Delete item?')">
-          <button class="btn btn-sm btn-outline-danger">Delete</button>
-        </form>
-      </td>
-    </tr>
-  {% endfor %}
-  </tbody>
-</table>
-
-
-
 <script>
-  // --- 1. SEARCH FILTER LOGIC ---
-  document.getElementById('itemFilter').addEventListener('keyup', function() {
-    const filter = this.value.toLowerCase();
-    const rows = document.querySelectorAll('#itemTableBody tr');
-    rows.forEach(row => {
-      row.style.display = row.textContent.toLowerCase().includes(filter) ? '' : 'none';
-    });
-  });
-
-  // --- 2. TABLE SORT LOGIC ---
+  // TABLE SORT LOGIC (remains frontend-only for the current page of 100 items)
   function sortTable(n) {
     const table = document.getElementById("inventoryTable");
-    let switching = true;
-    let dir = "asc"; 
-    let switchcount = 0;
-
+    let switching = true, dir = "asc", switchcount = 0;
     while (switching) {
       switching = false;
       const rows = table.rows;
       for (var i = 1; i < (rows.length - 1); i++) {
         var shouldSwitch = false;
-        var x = rows[i].getElementsByTagName("TD")[n];
-        var y = rows[i + 1].getElementsByTagName("TD")[n];
-
-        var xVal = x.textContent.toLowerCase();
-        var yVal = y.textContent.toLowerCase();
-
-        // Check if values are numeric for proper sorting
-        var xNum = parseFloat(xVal);
-        var yNum = parseFloat(yVal);
-        
-        if (!isNaN(xNum) && !isNaN(yNum)) {
-          xVal = xNum;
-          yVal = yNum;
-        }
-
-        if (dir == "asc") {
-          if (xVal > yVal) { shouldSwitch = true; break; }
-        } else if (dir == "desc") {
-          if (xVal < yVal) { shouldSwitch = true; break; }
-        }
+        var x = rows[i].getElementsByTagName("TD")[n], y = rows[i + 1].getElementsByTagName("TD")[n];
+        var xVal = x.textContent.toLowerCase(), yVal = y.textContent.toLowerCase();
+        if (dir == "asc") { if (xVal > yVal) { shouldSwitch = true; break; } }
+        else { if (xVal < yVal) { shouldSwitch = true; break; } }
       }
-      if (shouldSwitch) {
-        rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
-        switching = true;
-        switchcount ++;      
-      } else {
-        if (switchcount == 0 && dir == "asc") {
-          dir = "desc";
-          switching = true;
-        }
-      }
+      if (shouldSwitch) { rows[i].parentNode.insertBefore(rows[i + 1], rows[i]); switching = true; switchcount++; }
+      else if (switchcount == 0 && dir == "asc") { dir = "desc"; switching = true; }
     }
   }
 </script>
