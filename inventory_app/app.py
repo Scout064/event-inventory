@@ -220,9 +220,15 @@ class ItemForm(FlaskForm):
 
 
 class ProductionForm(FlaskForm):
-    name = StringField("Name", validators=[DataRequired(), Length(min=1, max=255)])
+    name = StringField(
+        "Name",
+        validators=[
+            DataRequired(message="Production name is required"),
+            Length(min=1, max=64, message="Name must be between 1 and 64 characters")
+        ]
+    )
     date = StringField("Date (YYYY-MM-DD)", validators=[Optional()])
-    notes = TextAreaField("Notes", validators=[Optional()])
+    notes = TextAreaField("Notes", validators=[Optional(), Length(max=500, message="Notes cannot exceed 500 characters")])
     submit = SubmitField("Save")
 
 
