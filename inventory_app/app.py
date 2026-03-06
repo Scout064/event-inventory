@@ -423,16 +423,39 @@ def index():
 
 
 # Items
-@app.route("/items")
+# In app.py - Update the items route
+@app.route('/items')
 @login_required
 def items():
+    # Get current page from URL (default to 1)
+    page = request.args.get('page', 1, type=int)
+    per_page = 100
+    offset = (page - 1) * per_page
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT inventory_id, name, category, serial_number, manufacturer, model FROM items ORDER BY name")
+    # 1. Get the total count of items to calculate total pages
+    cur.execute("SELECT COUNT(*) FROM items")
+    total_items = cur.fetchone()[0]
+    total_pages = (total_items + per_page - 1) // per_page  # Ceiling division
+    # 2. Fetch only the 100 items for the current page
+    # Note: Added an ORDER BY to ensure consistent paging
+    query = """
+        SELECT inventory_id, name, category, serial_number, manufacturer, model
+        FROM items
+        ORDER BY inventory_id ASC
+        LIMIT %s OFFSET %s
+    """
+    cur.execute(query, (per_page, offset))
     rows = cur.fetchall()
     cur.close()
     conn.close()
-    return render_template("items.html", rows=rows)
+    return render_template(
+        "items.html",
+        rows=rows,
+        page=page,
+        total_pages=total_pages,
+        total_items=total_items
+    )
 
 
 @app.route("/items/new", methods=["GET", "POST"])
