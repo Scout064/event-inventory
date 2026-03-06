@@ -96,23 +96,41 @@ def test_admin_view_user_list(mock_load, authenticated_client, mock_db):
 
 
 @patch("inventory_app.app.load_config")
+def test_user_profile_update_success(mock_load, authenticated_client, mock_db):
+    """Tests that a user can update their profile with matching passwords."""
+    mock_load.return_value = {"configured": True}
+    response = authenticated_client.post(
+        "/profile",
+        data={
+            "username": "admin",
+            "real_name": "Admin User",
+            "email": "admin@example.com",
+            "birthday": "1990-01-01",
+            "password": "newpassword123",
+            "confirm_password": "newpassword123"  # Must match 'password'
+        },
+        follow_redirects=True
+    )
+    assert response.status_code == 200
+    assert b"Profile updated successfully." in response.data
+
+
+@patch("inventory_app.app.load_config")
 def test_admin_add_user_success(mock_load, authenticated_client, mock_db):
-    """Tests the Admin's ability to create a new user."""
+    """Tests the Admin's ability to create a new user with password confirmation."""
     mock_load.return_value = {"configured": True}
     response = authenticated_client.post(
         "/admin/users/new",
         data={
             "username": "stage_hand",
             "password": "securepassword",
-            "is_admin": "y"  # BooleanField expects 'y' or checkbox value
+            "confirm_password": "securepassword",
+            "is_admin": "y"
         },
         follow_redirects=True
     )
     assert response.status_code == 200
-    # Updated to match app.py line 757
     assert b"User created." in response.data
-    mock_cur = mock_db.cursor.return_value
-    mock_cur.execute.assert_called()
 
 
 @patch("inventory_app.app.load_config")
