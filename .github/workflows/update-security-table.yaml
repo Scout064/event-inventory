@@ -113,8 +113,8 @@ jobs:
 
           # Sync and Push to Beta
           git pull --rebase origin Beta
-          git push origin HEAD:Beta
+          git push origin HEAD:main
 
-          # Sync and Push to Beta
+          # Sync and Push to Alpha
           git pull --rebase origin Alpha
-          git push origin HEAD:Alpha
+          git push origin HEAD:main
