@@ -518,28 +518,39 @@ def items_download_template():
 def process_item_row(cur, row):
     """
     Helper to process a single CSV row.
-    Returns 1 for success, 2 for duplicate, 3 for other error.
+    Returns: 0 (Skip Empty), 1 (Success), 2 (Duplicate), 3 (Error)
     """
+    # Clean the row to handle None values and strip whitespace safely
+    cleaned = {k: (v.strip() if v else '') for k, v in row.items() if k}
+    # If the row is completely empty (e.g., trailing commas), silently skip it
+    if not any(cleaned.values()):
+        return 0
+    inv_id = cleaned.get('inventory_id', '')
+    name = cleaned.get('name', '')
+    # Enforce mandatory fields: ID and Name cannot be blank
+    if not inv_id or not name:
+        return 3
     try:
         cur.execute("""
             INSERT INTO items (inventory_id, name, category, description,
                                serial_number, manufacturer, model)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
         """, (
-            row['inventory_id'].strip(),
-            row['name'].strip(),
-            row.get('category', '').strip() or None,
-            row.get('description', '').strip() or None,
-            row.get('serial_number', '').strip() or None,
-            row.get('manufacturer', '').strip() or None,
-            row.get('model', '').strip() or None
+            inv_id,
+            name,
+            cleaned.get('category') or None,
+            cleaned.get('description') or None,
+            cleaned.get('serial_number') or None,
+            cleaned.get('manufacturer') or None,
+            cleaned.get('model') or None
         ))
         return 1  # Success
     except mariadb.IntegrityError as ie:
         if ie.errno == 1062:
             return 2  # Duplicate
         return 3      # Other DB Error
-    except Exception:
+    except Exception as e:
+        print(f"Row Exception: {e}")
         return 3      # General Error
 
 
@@ -556,16 +567,17 @@ def items_import():
         reader = csv.DictReader(stream)
         conn = get_db()
         cur = conn.cursor()
-        counts = {1: 0, 2: 0, 3: 0}  # Success, Duplicate, Error
+        counts = {1: 0, 2: 0, 3: 0}  # 1: Success, 2: Duplicate, 3: Error
         for row in reader:
             result = process_item_row(cur, row)
-            counts[result] += 1
+            if result in counts:  # Result 0 (Skip) is ignored and not counted
+                counts[result] += 1
         conn.commit()
         cur.close()
         conn.close()
         msg = f"{counts[1]} Items Imported, {counts[2]} not Imported (identical ID)"
         if counts[3] > 0:
-            msg += f". Warning: {counts[3]} other errors occurred."
+            msg += f". Warning: {counts[3]} rows had missing mandatory fields or errors."
         flash(msg, "success" if counts[2] == 0 and counts[3] == 0 else "warning")
         return redirect(url_for("items"))
     return render_template("items_import.html")
