@@ -4,15 +4,19 @@ import io
 
 @patch("inventory_app.app.load_config")
 def test_list_items(mock_load, authenticated_client, mock_db):
-    """Tests GET /items with a pre-logged in user."""
     mock_load.return_value = {"configured": True}
     mock_cur = mock_db.cursor.return_value
+    # First call: COUNT(*) fetchone()
+    # Second call: rows fetchall()
+    mock_cur.fetchone.return_value = (1,)
     mock_cur.fetchall.return_value = [
         ("ID1", "Mic", "Audio", "SN1", "Shure", "SM58")
     ]
     response = authenticated_client.get("/items")
     assert response.status_code == 200
     assert b"Shure" in response.data
+    # Verify pagination is showing current page
+    assert b"Showing page 1 of 1" in response.data
 
 
 @patch("inventory_app.app.load_config")
@@ -48,6 +52,19 @@ def test_item_label_png(mock_load, authenticated_client, mock_db):
     assert response.status_code == 200
     assert response.mimetype == "image/png"
     assert len(response.data) > 0
+
+
+@patch("inventory_app.app.load_config")
+def test_items_search_query(mock_load, authenticated_client, mock_db):
+    mock_load.return_value = {"configured": True}
+    mock_cur = mock_db.cursor.return_value
+    mock_cur.fetchone.return_value = (0,)
+    # Search for "Shure"
+    response = authenticated_client.get("/items?q=Shure")
+    # Check if the query was executed with the wildcard %Shure%
+    # (Assuming it's the 7-parameter tuple you defined in app.py)
+    called_args = mock_cur.execute.call_args[0]
+    assert "%Shure%" in called_args[1]
 
 
 @patch("inventory_app.app.load_config")
@@ -113,6 +130,43 @@ def test_user_profile_update_success(mock_load, authenticated_client, mock_db):
     )
     assert response.status_code == 200
     assert b"Profile updated successfully." in response.data
+
+
+@patch("inventory_app.app.load_config")
+def test_profile_update_confirm_required(mock_load, authenticated_client, mock_db):
+    mock_load.return_value = {"configured": True}
+    response = authenticated_client.post("/profile", data={
+        "username": "ValidUser",
+        "password": "newpassword123",
+        "confirm_password": "newpassword123",
+        "submit": "Save Profile"
+    }, follow_redirects=True)
+    assert response.status_code == 200
+
+
+@patch("inventory_app.app.load_config")
+def test_username_validation_rules(mock_load, authenticated_client, mock_db):
+    mock_load.return_value = {"configured": True}
+    # 1. Test invalid special characters
+    response = authenticated_client.post("/profile", data={
+        "username": "User<Script>", # Forbidden characters
+        "submit": "Save Profile"
+    })
+    assert b"Username contains invalid special characters" in response.data
+    # 2. Test length limit (33 chars)
+    long_username = "A" * 33
+    response = authenticated_client.post("/profile", data={
+        "username": long_username,
+        "submit": "Save Profile"
+    })
+    assert b"Username must be between 3 and 32 characters" in response.data
+    # 3. Test allowed language-specific characters (Should PASS)
+    response = authenticated_client.post("/profile", data={
+        "username": "Müller_éè",
+        "submit": "Save Profile"
+    })
+    # If the regex works, it won't show the error message
+    assert b"Username contains invalid special characters" not in response.data
 
 
 @patch("inventory_app.app.load_config")
