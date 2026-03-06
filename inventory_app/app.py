@@ -20,7 +20,7 @@ from wtforms import (
     StringField, PasswordField, SubmitField, BooleanField,
     TextAreaField, FileField, DateField
 )
-from wtforms.validators import DataRequired, Length, Optional, Email
+from wtforms.validators import DataRequired, Length, Optional, Email, EqualTo
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from reportlab.lib.pagesizes import A4
@@ -229,6 +229,11 @@ class ProductionForm(FlaskForm):
 class UserAdminForm(FlaskForm):
     username = StringField("Username", validators=[DataRequired(), Length(min=3, max=128)])
     password = PasswordField("Password (leave blank to keep current)", validators=[Optional(), Length(min=6)])
+    # Added confirm_password field
+    confirm_password = PasswordField(
+        "Confirm Password",
+        validators=[EqualTo('password', message='Passwords must match')]
+    )
     is_admin = BooleanField("Grant Admin Privileges")
     submit = SubmitField("Save User")
 
@@ -239,6 +244,11 @@ class UserProfileForm(FlaskForm):
     email = StringField("E-Mail Address", validators=[Optional(), Email(), Length(max=255)])
     birthday = DateField("Birthday", format='%Y-%m-%d', validators=[Optional()])
     password = PasswordField("New Password (leave blank to keep current)", validators=[Optional(), Length(min=6)])
+    # Added confirm_password field
+    confirm_password = PasswordField(
+        "Confirm New Password",
+        validators=[EqualTo('password', message='Passwords must match')]
+    )
     submit = SubmitField("Save Profile")
 
 
