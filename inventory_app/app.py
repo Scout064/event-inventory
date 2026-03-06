@@ -426,7 +426,7 @@ def index():
 # In app.py - Update the items route
 @app.route('/items')
 @login_required
-def items():
+def items_view():
     # 1. Get parameters from the URL
     page = request.args.get('page', 1, type=int)
     q = request.args.get('q', '').strip()
