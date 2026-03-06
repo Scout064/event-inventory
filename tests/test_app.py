@@ -173,7 +173,8 @@ def test_items_bulk_import_logic(mock_load, authenticated_client, mock_db):
         follow_redirects=True
     )
     assert response.status_code == 200
-    assert b"Import complete!" in response.data
+    assert b"Items Imported" in response.data
+    assert b"not Imported (identical ID)" in response.data
     # Verify the database was actually called with the correct data
     mock_cur = mock_db.cursor.return_value
     # Check if the execute was called with our "ON DUPLICATE KEY UPDATE" query
