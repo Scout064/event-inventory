@@ -20,7 +20,10 @@ from wtforms import (
     StringField, PasswordField, SubmitField, BooleanField,
     TextAreaField, FileField, DateField
 )
-from wtforms.validators import DataRequired, Length, Optional, Email, EqualTo
+from wtforms.validators import (
+    DataRequired, Length, Optional, Email,
+    EqualTo, Regexp
+)
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from reportlab.lib.pagesizes import A4
@@ -233,21 +236,49 @@ class ProductionForm(FlaskForm):
 
 
 class UserAdminForm(FlaskForm):
-    username = StringField("Username", validators=[DataRequired(), Length(min=3, max=128)])
+    username = StringField(
+        "Username",
+        validators=[
+            DataRequired(),
+            Length(min=3, max=32, message="Username must be between 3 and 32 characters."),
+            # Allows letters, numbers, specific language characters, dots, hyphens, and underscores
+            Regexp(r'^[a-zA-Z0-9äöüÄÖÜßéèêáàâíìîóòôúùûñÑçÇ._\-]+$', message="Username contains invalid special characters.")
+        ]
+    )
     password = PasswordField("Password (leave blank to keep current)", validators=[Optional(), Length(min=6)])
-    # Add this:
     confirm_password = PasswordField("Confirm Password", validators=[EqualTo('password', message='Passwords must match')])
     is_admin = BooleanField("Grant Admin Privileges")
     submit = SubmitField("Save User")
 
 
 class UserProfileForm(FlaskForm):
-    username = StringField("Username", validators=[DataRequired(), Length(min=3, max=128)])
-    real_name = StringField("Real Name", validators=[Optional(), Length(max=255)])
-    email = StringField("E-Mail Address", validators=[Optional(), Email(), Length(max=255)])
+    username = StringField(
+        "Username",
+        validators=[
+            DataRequired(),
+            Length(min=3, max=32, message="Username must be between 3 and 32 characters."),
+            Regexp(r'^[a-zA-Z0-9äöüÄÖÜßéèêáàâíìîóòôúùûñÑçÇ._\-]+$', message="Username contains invalid special characters.")
+        ]
+    )
+    real_name = StringField(
+        "Real Name",
+        validators=[
+            Optional(),
+            Length(max=32, message="Real name cannot exceed 32 characters."),
+            # Same as above but allows spaces
+            Regexp(r'^[a-zA-Z0-9äöüÄÖÜßéèêáàâíìîóòôúùûñÑçÇ\s.\-]+$', message="Real name contains invalid special characters.")
+        ]
+    )
+    email = StringField(
+        "E-Mail Address",
+        validators=[
+            Optional(),
+            Email(),
+            Length(max=32, message="Email cannot exceed 32 characters.")
+        ]
+    )
     birthday = DateField("Birthday", format='%Y-%m-%d', validators=[Optional()])
     password = PasswordField("New Password (leave blank to keep current)", validators=[Optional(), Length(min=6)])
-    # Add this:
     confirm_password = PasswordField("Confirm New Password", validators=[EqualTo('password', message='Passwords must match')])
     submit = SubmitField("Save Profile")
 
