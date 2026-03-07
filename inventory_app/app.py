@@ -980,7 +980,7 @@ def report_items_pdf():
     conn.close()
 
     bio = io.BytesIO()
-    c = canvas.Canvas(bio, pagesize=A4)
+    c = canvas.Canvas(bio, pagesize=A4, pageCompression=1)
     width, height = A4
     y = height - 20 * mm
     c.setFont("Helvetica-Bold", 14)
@@ -1022,7 +1022,7 @@ def report_production_pdf(pid):
     conn.close()
 
     bio = io.BytesIO()
-    c = canvas.Canvas(bio, pagesize=A4)
+    c = canvas.Canvas(bio, pagesize=A4, pageCompression=1)
     width, height = A4
     y = height - 20 * mm
     c.setFont("Helvetica-Bold", 14)
