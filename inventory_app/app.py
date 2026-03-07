@@ -156,14 +156,6 @@ def find_user_by_id(user_id):
     return None
 
 
-def normalize_username(username: str) -> str:
-    username = username.lower()
-    username = username.translate(LEET_MAP)
-    # remove separators
-    username = re.sub(r"[\W_]+", "", username)
-    return username
-
-
 @login_manager.user_loader
 def load_user(user_id):
     cfg = load_config()
