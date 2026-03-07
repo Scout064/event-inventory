@@ -11,11 +11,11 @@ fi
 
 # Find paths
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
-SRC_DIR="$SCRIPT_DIR/inventory_app"
+SRC_DIR="$SCRIPT_DIR"
 APP_DIR="/var/www/inventory"
-CONFIG_FILE="$APP_DIR/config.json"
-VENV_PIP="$APP_DIR/venv/bin/pip"
-BACKUP_DIR="$APP_DIR/backups"
+CONFIG_FILE="$APP_DIR/inventory_app/config.json"
+VENV_PIP="$APP_DIR/inventory_app/venv/bin/pip"
+BACKUP_DIR="$APP_DIR/inventory_app/backups"
 
 echo "--- Starting Automated Deployment ---"
 
@@ -27,19 +27,16 @@ fi
 
 # 1. Safely copy new App Code
 echo "Copying new files from $SRC_DIR to $APP_DIR..."
-rsync -av --exclude="venv" \
-          --exclude="config.json" \
-          --exclude="static/qr_codes" \
-          --exclude="uploads" \
-          --exclude="backups" \
-          --exclude="*.sqlite" \
-          --exclude="__pycache__" \
-          "$SRC_DIR/" "$APP_DIR/"
+rsync -av \
+  --include="inventory_app/***" \
+  --include="wsgi.py" \
+  --exclude="*" \
+  "$SRC_DIR/" "$APP_DIR/"
 
 # 2. Update Python Dependencies
-if [ -f "$APP_DIR/requirements.txt" ]; then
+if [ -f "$APP_DIR/inventory_app/requirements.txt" ]; then
     echo "Checking for new or missing Python modules..."
-    $VENV_PIP install -r "$APP_DIR/requirements.txt"
+    $VENV_PIP install -r "$APP_DIR/inventory_app/requirements.txt"
 fi
 
 # 3. Update Permissions
@@ -74,14 +71,14 @@ fi
 
 # 6. Apply Schema & Migrations
 echo "Applying base schema and checking migrations..."
-mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$APP_DIR/schema.sql"
+mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$APP_DIR/inventory_app/schema.sql"
 
 CURRENT_VER=$(mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" -N -s -e "SELECT MAX(version) FROM schema_version;")
 [ -z "$CURRENT_VER" ] || [ "$CURRENT_VER" == "NULL" ] && CURRENT_VER=1
 
 if [ "$CURRENT_VER" -lt 2 ]; then
     echo "Upgrading Database to Version 2..."
-    mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$APP_DIR/migrations.sql"
+    mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$APP_DIR/inventory_app/migrations.sql"
     mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "DELETE FROM schema_version WHERE version < 2;"
 fi
 

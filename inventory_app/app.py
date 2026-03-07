@@ -2,10 +2,11 @@ import os
 import json
 import re
 import io
-from functools import wraps
-from datetime import datetime
 import mariadb
 import qrcode
+import csv
+from functools import wraps
+from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
 from flask import (
     Flask, render_template, request, redirect, url_for, flash,
@@ -29,7 +30,7 @@ from werkzeug.utils import secure_filename
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
-import csv
+from inventory_app.security import ReservedUsername
 
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -257,7 +258,11 @@ class UserProfileForm(FlaskForm):
         validators=[
             DataRequired(),
             Length(min=3, max=32, message="Username must be between 3 and 32 characters."),
-            Regexp(r'^[a-zA-Z0-9äöüÄÖÜßéèêáàâíìîóòôúùûñÑçÇ._\-]+$', message="Username contains invalid special characters.")
+            Regexp(
+                r'^[a-zA-Z0-9äöüÄÖÜßéèêáàâíìîóòôúùûñÑçÇ._\-]+$',
+                message="Username contains invalid special characters."
+            ),
+            ReservedUsername()
         ]
     )
     real_name = StringField(
@@ -266,7 +271,10 @@ class UserProfileForm(FlaskForm):
             Optional(),
             Length(max=32, message="Real name cannot exceed 32 characters."),
             # Same as above but allows spaces
-            Regexp(r'^[a-zA-Z0-9äöüÄÖÜßéèêáàâíìîóòôúùûñÑçÇ\s.\-]+$', message="Real name contains invalid special characters.")
+            Regexp(
+                r'^[a-zA-Z0-9äöüÄÖÜßéèêáàâíìîóòôúùûñÑçÇ\s.\-]+$',
+                message="Real name contains invalid special characters."
+            )
         ]
     )
     email = StringField(
@@ -350,7 +358,6 @@ def setup():
             except ValueError:
                 flash("Logo must be PNG or JPEG.", "danger")
                 return render_template("setup.html", form=form, configured=False)
-
         new_cfg = {
             "configured": True,
             "app_domain": form.app_domain.data.strip(),
@@ -361,7 +368,6 @@ def setup():
             "db_pass": form.db_pass.data,
             "logo_path": logo_path,
         }
-
         try:
             with mariadb.connect(
                 user=new_cfg["db_user"],
@@ -374,7 +380,6 @@ def setup():
         except mariadb.Error as ex:
             flash(f"Database connection failed: {ex}", "danger")
             return render_template("setup.html", form=form, configured=False)
-
         save_config(new_cfg)
         init_db()
         conn = get_db()
@@ -942,27 +947,21 @@ def label_png(inventory_id):
     conn.close()
     if not row:
         abort(404)
-
     # Unpack values and replace None with empty strings
     inventory_id_val, name, category, serial, manufacturer, model = (str(v or '') for v in row)
-
     # Generate QR
     qr = generate_qr_with_logo(inventory_id_val, cfg.get("logo_path"))
-
     # Create label image (100mm x 54mm at 300dpi)
     dpi = 300
     width_px = int((100 / 25.4) * dpi)
     height_px = int((54 / 25.4) * dpi)
     label = Image.new("RGB", (width_px, height_px), "white")
-
     # Paste QR on the left
     qr_size = int(height_px * 0.9)
     qr = qr.resize((qr_size, qr_size), Image.LANCZOS)
     label.paste(qr, (int(height_px * 0.05), int(height_px * 0.05)))
-
     draw = ImageDraw.Draw(label)
     font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-
     # Prepare text lines
     lines = []
     if inventory_id_val:
@@ -973,26 +972,22 @@ def label_png(inventory_id):
         lines.append(f"SN: {serial}")
     if manufacturer or model:
         lines.append(f"{manufacturer} {model}".strip())
-
     # Text area
     x = qr_size + int(height_px * 0.1)
     y_start = int(height_px * 0.12)
     max_text_width = width_px - x - int(height_px * 0.05)
     max_text_height = height_px - y_start - int(height_px * 0.05)
-
     # Initial sizes
     base_font_size = int(height_px * 0.08)
     min_font_size = 10
-
     # Function to compute block height for given font size
+
     def compute_block_height(f_size):
         return len(lines) * f_size + (len(lines) - 1) * int(f_size * 0.5)
-
     # Scale font size down if block is too tall
     font_size = base_font_size
     while compute_block_height(font_size) > max_text_height and font_size > min_font_size:
         font_size -= 1
-
     # Now draw each line, adjusting horizontally too
     y = y_start
     for idx, text in enumerate(lines):
@@ -1065,7 +1060,6 @@ def report_production_pdf(pid):
     items = cur.fetchall()
     cur.close()
     conn.close()
-
     bio = io.BytesIO()
     c = canvas.Canvas(bio, pagesize=A4, pageCompression=1)
     width, height = A4
@@ -1109,7 +1103,6 @@ def search():
         return redirect(url_for("index"))
 
     cur = conn.cursor()
-
     # 1. Search Items (Matched with your schema)
     cur.execute("""
         SELECT inventory_id, name, category, manufacturer
@@ -1117,7 +1110,6 @@ def search():
         WHERE name LIKE %s OR inventory_id LIKE %s OR serial_number LIKE %s OR model LIKE %s
     """, (search_term, search_term, search_term, search_term))
     items_list = cur.fetchall()
-
     # 2. Search Productions
     cur.execute("""
         SELECT id, name, date
@@ -1125,14 +1117,11 @@ def search():
         WHERE name LIKE %s OR notes LIKE %s
     """, (search_term, search_term))
     productions_list = cur.fetchall()
-
     # 3. Search Users
     cur.execute("SELECT id, username, is_admin FROM users WHERE username LIKE %s", (search_term,))
     users_list = cur.fetchall()
-
     cur.close()
     conn.close()
-
     return render_template(
         "search_results.html",
         query=query,
