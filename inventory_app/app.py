@@ -40,48 +40,6 @@ QR_DIR = os.path.join(APP_DIR, "static", "qr_codes")
 os.makedirs(QR_DIR, exist_ok=True)
 
 
-LEET_MAP = str.maketrans({
-    "0": "o",
-    "1": "i",
-    "3": "e",
-    "4": "a",
-    "5": "s",
-    "7": "t",
-    "@": "a",
-    "$": "s",
-    "!": "i"
-})
-
-
-RESERVED_USERNAMES = {
-    "admin",
-    "administrator",
-    "root",
-    "system",
-    "support",
-    "security",
-    # route / API conflicts
-    "login",
-    "logout",
-    "signup",
-    "register",
-    "api",
-    "user",
-    "users",
-    # technical / dangerous values
-    "null",
-    "undefined",
-    "none",
-    "true",
-    "false"
-}
-
-
-RESERVED_PATTERNS = re.compile(
-    r"(admin|administrator|root|superuser|sysadmin|moderator|staff|support|owner)"
-)
-
-
 def load_config():
     if not os.path.exists(CONFIG_PATH):
         return {"configured": False}
@@ -142,17 +100,6 @@ LAN_REGEX = re.compile(
     r"^(127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|"
     r"172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+)$"
 )
-
-
-def is_forbidden_username(username: str) -> bool:
-    normalized = normalize_username(username)
-    # exact match block
-    if normalized in RESERVED_USERNAMES:
-        return True
-    # admin-style keyword block
-    if RESERVED_PATTERNS.search(normalized):
-        return True
-    return False
 
 
 @app.before_request
@@ -411,7 +358,6 @@ def setup():
             except ValueError:
                 flash("Logo must be PNG or JPEG.", "danger")
                 return render_template("setup.html", form=form, configured=False)
-
         new_cfg = {
             "configured": True,
             "app_domain": form.app_domain.data.strip(),
@@ -422,7 +368,6 @@ def setup():
             "db_pass": form.db_pass.data,
             "logo_path": logo_path,
         }
-
         try:
             with mariadb.connect(
                 user=new_cfg["db_user"],
@@ -435,7 +380,6 @@ def setup():
         except mariadb.Error as ex:
             flash(f"Database connection failed: {ex}", "danger")
             return render_template("setup.html", form=form, configured=False)
-
         save_config(new_cfg)
         init_db()
         conn = get_db()
@@ -1003,27 +947,21 @@ def label_png(inventory_id):
     conn.close()
     if not row:
         abort(404)
-
     # Unpack values and replace None with empty strings
     inventory_id_val, name, category, serial, manufacturer, model = (str(v or '') for v in row)
-
     # Generate QR
     qr = generate_qr_with_logo(inventory_id_val, cfg.get("logo_path"))
-
     # Create label image (100mm x 54mm at 300dpi)
     dpi = 300
     width_px = int((100 / 25.4) * dpi)
     height_px = int((54 / 25.4) * dpi)
     label = Image.new("RGB", (width_px, height_px), "white")
-
     # Paste QR on the left
     qr_size = int(height_px * 0.9)
     qr = qr.resize((qr_size, qr_size), Image.LANCZOS)
     label.paste(qr, (int(height_px * 0.05), int(height_px * 0.05)))
-
     draw = ImageDraw.Draw(label)
     font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-
     # Prepare text lines
     lines = []
     if inventory_id_val:
@@ -1034,26 +972,21 @@ def label_png(inventory_id):
         lines.append(f"SN: {serial}")
     if manufacturer or model:
         lines.append(f"{manufacturer} {model}".strip())
-
     # Text area
     x = qr_size + int(height_px * 0.1)
     y_start = int(height_px * 0.12)
     max_text_width = width_px - x - int(height_px * 0.05)
     max_text_height = height_px - y_start - int(height_px * 0.05)
-
     # Initial sizes
     base_font_size = int(height_px * 0.08)
     min_font_size = 10
-
     # Function to compute block height for given font size
     def compute_block_height(f_size):
         return len(lines) * f_size + (len(lines) - 1) * int(f_size * 0.5)
-
     # Scale font size down if block is too tall
     font_size = base_font_size
     while compute_block_height(font_size) > max_text_height and font_size > min_font_size:
         font_size -= 1
-
     # Now draw each line, adjusting horizontally too
     y = y_start
     for idx, text in enumerate(lines):
@@ -1065,7 +998,6 @@ def label_png(inventory_id):
             font = ImageFont.truetype(font_path, size)
         draw.text((x, y), text, font=font, fill="black")
         y += size + int(size * 0.5)
-
     # Output PNG
     bio = io.BytesIO()
     label.save(bio, format="PNG")
@@ -1126,7 +1058,6 @@ def report_production_pdf(pid):
     items = cur.fetchall()
     cur.close()
     conn.close()
-
     bio = io.BytesIO()
     c = canvas.Canvas(bio, pagesize=A4, pageCompression=1)
     width, height = A4
@@ -1170,7 +1101,6 @@ def search():
         return redirect(url_for("index"))
 
     cur = conn.cursor()
-
     # 1. Search Items (Matched with your schema)
     cur.execute("""
         SELECT inventory_id, name, category, manufacturer
@@ -1178,7 +1108,6 @@ def search():
         WHERE name LIKE %s OR inventory_id LIKE %s OR serial_number LIKE %s OR model LIKE %s
     """, (search_term, search_term, search_term, search_term))
     items_list = cur.fetchall()
-
     # 2. Search Productions
     cur.execute("""
         SELECT id, name, date
@@ -1186,14 +1115,11 @@ def search():
         WHERE name LIKE %s OR notes LIKE %s
     """, (search_term, search_term))
     productions_list = cur.fetchall()
-
     # 3. Search Users
     cur.execute("SELECT id, username, is_admin FROM users WHERE username LIKE %s", (search_term,))
     users_list = cur.fetchall()
-
     cur.close()
     conn.close()
-
     return render_template(
         "search_results.html",
         query=query,
