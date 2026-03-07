@@ -30,7 +30,7 @@ from werkzeug.utils import secure_filename
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
-from security import is_forbidden_username
+from security import ReservedUsername
 
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -276,7 +276,8 @@ class UserProfileForm(FlaskForm):
             Length(max=32, message="Real name cannot exceed 32 characters."),
             # Same as above but allows spaces
             Regexp(r'^[a-zA-Z0-9äöüÄÖÜßéèêáàâíìîóòôúùûñÑçÇ\s.\-]+$', message="Real name contains invalid special characters.")
-        ]
+        ],
+        ReservedUsername()
     )
     email = StringField(
         "E-Mail Address",
@@ -1152,10 +1153,6 @@ def profile():
         form.birthday.data = row[3]  # WTForms DateField handles the datetime.date object automatically
     if form.validate_on_submit():
         uname = form.username.data.strip()
-        if not getattr(current_user, "is_admin", False):
-            if is_forbidden_username(uname):
-                flash("This username is reserved or too similar to an administrator account.", "danger")
-                return render_template("profile.html", form=form)
         rname = form.real_name.data.strip() if form.real_name.data else None
         email = form.email.data.strip() if form.email.data else None
         bday = form.birthday.data
