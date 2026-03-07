@@ -14,7 +14,7 @@ echo "=== Event Inventory Management System Installer ==="
 # ---------------------------------------------------------
 APP_DIR="/var/www/inventory"
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
-SRC_DIR="$SCRIPT_DIR/inventory_app"
+SRC_DIR="$SCRIPT_DIR"
 
 # Database Inputs
 read -p "Database Host (e.g., 127.0.0.1): " DB_HOST
@@ -78,8 +78,8 @@ EOF
 # ---------------------------------------------------------
 echo "--- Deploying Application Files ---"
 mkdir -p "$APP_DIR"
-mkdir -p "$APP_DIR/static/qr_codes"
-mkdir -p "$APP_DIR/uploads"
+mkdir -p "$APP_DIR/inventory_app/static/qr_codes"
+mkdir -p "$APP_DIR/inventory_app/uploads"
 
 if [ ! -d "$SRC_DIR" ]; then
     echo "❌ Error: inventory_app folder not found at $SRC_DIR"
@@ -87,7 +87,11 @@ if [ ! -d "$SRC_DIR" ]; then
 fi
 
 # Copy app code
-rsync -av "$SRC_DIR/" "$APP_DIR/"
+rsync -av \
+  --include="inventory_app/***" \
+  --include="wsgi.py" \
+  --exclude="*" \
+  "$SRC_DIR/" "$APP_DIR/"
 
 # Create config.json
 cat <<EOF > "$APP_DIR/config.json"
@@ -100,13 +104,13 @@ cat <<EOF > "$APP_DIR/config.json"
 EOF
 
 # Setup Virtual Environment
-cd "$APP_DIR"
+cd "$APP_DIR/inventory_app"
 python3 -m venv venv
 ./venv/bin/pip install -r requirements.txt
 
 # Apply Schema & Migrations
 echo "Applying base schema and checking migrations..."
-mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$APP_DIR/schema.sql"
+mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$APP_DIR/inventory_app/schema.sql"
 
 # ---------------------------------------------------------
 # 5. Apache Configuration
@@ -124,7 +128,7 @@ if [[ "$USE_REVERSE_PROXY" =~ ^[Yy]$ ]]; then
     ErrorLog \${APACHE_LOG_DIR}/inventory_error.log
     CustomLog \${APACHE_LOG_DIR}/inventory_access.log combined
 
-    WSGIDaemonProcess inventory_app python-home=$APP_DIR/venv python-path=$APP_DIR
+    WSGIDaemonProcess inventory_app python-home=$APP_DIR/inventory_app/venv python-path=$APP_DIR/inventory_app
     WSGIScriptAlias / $APP_DIR/wsgi.py
     <Directory $APP_DIR>
         Require all granted
@@ -155,7 +159,7 @@ else
     RewriteRule ^/(.*)$ https://%{HTTP_HOST}/\$1 [R=301,L]
 
     DocumentRoot $APP_DIR
-    WSGIDaemonProcess inventory_app_http python-home=$APP_DIR/venv python-path=$APP_DIR
+    WSGIDaemonProcess inventory_app_http python-home=$APP_DIR/inventory_app/venv python-path=$APP_DIR/inventory_app
     WSGIScriptAlias / $APP_DIR/wsgi.py
     <Directory $APP_DIR>
         Require all granted
@@ -172,7 +176,7 @@ else
     SSLCertificateFile $CERT_FILE
     SSLCertificateKeyFile $KEY_FILE
 
-    WSGIDaemonProcess inventory_app_https python-home=$APP_DIR/venv python-path=$APP_DIR
+    WSGIDaemonProcess inventory_app_https python-home=$APP_DIR/inventory_app/venv python-path=$APP_DIR/inventory_app
     WSGIScriptAlias / $APP_DIR/wsgi.py
 
     <Directory $APP_DIR>
