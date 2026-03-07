@@ -260,3 +260,68 @@ def test_items_bulk_import_logic(mock_load, authenticated_client, mock_db):
     )
     assert response.status_code == 200
     assert b"1 Items Imported, 0 not Imported (identical ID)" in response.data
+
+
+@patch("inventory_app.app.load_config")
+def test_production_validation_rules(mock_load, authenticated_client, mock_db):
+    """Tests that the Production form enforces the 32-char name and 255-char notes limits."""
+    mock_load.return_value = {"configured": True}
+    # 1. Test Name too long (33 characters)
+    long_name = "A" * 33
+    response = authenticated_client.post("/productions/new", data={
+        "name": long_name,
+        "date": "2026-03-07",
+        "notes": "Valid notes",
+        "submit": "Save"
+    })
+    # WTForms should reject this and return the form with the error message
+    assert b"Name must be between 1 and 32 characters" in response.data
+    # 2. Test Notes too long (256 characters)
+    long_notes = "A" * 256
+    response = authenticated_client.post("/productions/new", data={
+        "name": "Valid Name",
+        "date": "2026-03-07",
+        "notes": long_notes,
+        "submit": "Save"
+    })
+    # WTForms should reject this and return the form with the error message
+    assert b"Notes cannot exceed 255 characters" in response.data
+
+
+@patch("inventory_app.app.load_config")
+def test_add_production_success(mock_load, authenticated_client, mock_db):
+    """Tests successful creation of a new Production."""
+    mock_load.return_value = {"configured": True}
+    mock_cur = mock_db.cursor.return_value
+    # Mock the response for the redirect to /productions list page
+    mock_cur.fetchall.return_value = [
+        (1, "Summer Festival", "2026-07-15", "Outdoor event notes")
+    ]
+    response = authenticated_client.post(
+        "/productions/new",
+        data={
+            "name": "Summer Festival",
+            "date": "2026-07-15",
+            "notes": "Outdoor event notes",
+            "submit": "Save"
+        },
+        follow_redirects=True
+    )
+    assert response.status_code == 200
+    # Verify the flash message from app.py
+    assert b"Production created." in response.data
+    # Verify the database execution was called with the correctly parsed date
+    expected_date = datetime.date(2026, 7, 15)
+    # Iterate through database calls to find our INSERT statement
+    insert_called = False
+    for call in mock_cur.execute.call_args_list:
+        query = call[0][0]
+        if "INSERT INTO productions" in query:
+            insert_called = True
+            args = call[0][1]
+            assert args[0] == "Summer Festival"
+            assert args[1] == expected_date
+            assert args[2] == "Outdoor event notes"
+    assert insert_called
+
+
