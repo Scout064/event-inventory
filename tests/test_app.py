@@ -1,5 +1,5 @@
 from unittest.mock import patch
-import io
+import io, datetime
 
 
 @patch("inventory_app.app.load_config")
