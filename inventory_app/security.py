@@ -1,4 +1,6 @@
 import re
+from flask_login import current_user
+from wtforms.validators import ValidationError
 
 LEET_MAP = str.maketrans({
     "0": "o",
