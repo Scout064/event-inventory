@@ -2,10 +2,11 @@ import os
 import json
 import re
 import io
-from functools import wraps
-from datetime import datetime
 import mariadb
 import qrcode
+import csv
+from functools import wraps
+from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
 from flask import (
     Flask, render_template, request, redirect, url_for, flash,
@@ -29,7 +30,7 @@ from werkzeug.utils import secure_filename
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
-import csv
+from security import is_forbidden_username
 
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -1151,6 +1152,10 @@ def profile():
         form.birthday.data = row[3]  # WTForms DateField handles the datetime.date object automatically
     if form.validate_on_submit():
         uname = form.username.data.strip()
+        if not getattr(current_user, "is_admin", False):
+            if is_forbidden_username(uname):
+                flash("This username is reserved or too similar to an administrator account.", "danger")
+                return render_template("profile.html", form=form)
         rname = form.real_name.data.strip() if form.real_name.data else None
         email = form.email.data.strip() if form.email.data else None
         bday = form.birthday.data
