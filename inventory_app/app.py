@@ -30,7 +30,7 @@ from werkzeug.utils import secure_filename
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
-from .security import ReservedUsername
+from inventory_app.security import ReservedUsername
 
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
