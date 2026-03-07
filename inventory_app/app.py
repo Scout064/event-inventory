@@ -258,7 +258,11 @@ class UserProfileForm(FlaskForm):
         validators=[
             DataRequired(),
             Length(min=3, max=32, message="Username must be between 3 and 32 characters."),
-            Regexp(r'^[a-zA-Z0-9äöüÄÖÜßéèêáàâíìîóòôúùûñÑçÇ._\-]+$', message="Username contains invalid special characters.")
+            Regexp(
+                r'^[a-zA-Z0-9äöüÄÖÜßéèêáàâíìîóòôúùûñÑçÇ._\-]+$',
+                message="Username contains invalid special characters."
+            ),
+            ReservedUsername()
         ]
     )
     real_name = StringField(
@@ -270,8 +274,7 @@ class UserProfileForm(FlaskForm):
             Regexp(
                 r'^[a-zA-Z0-9äöüÄÖÜßéèêáàâíìîóòôúùûñÑçÇ\s.\-]+$',
                 message="Real name contains invalid special characters."
-            ),
-            ReservedUsername()
+            )
         ]
     )
     email = StringField(
