@@ -52,3 +52,16 @@ def is_forbidden_username(username: str) -> bool:
     if RESERVED_PATTERNS.search(normalized):
         return True
     return False
+
+
+class ReservedUsername:
+    def __call__(self, form, field):
+        username = field.data.strip()
+        normalized = normalize_username(username)
+        # Allow admins to bypass
+        if getattr(current_user, "is_admin", False):
+            return
+        if normalized in RESERVED_USERNAMES:
+            raise ValidationError("This username is reserved.")
+        if RESERVED_PATTERNS.search(normalized):
+            raise ValidationError("This username is too similar to an administrator account.")
