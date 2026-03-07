@@ -32,7 +32,13 @@ RESERVED_USERNAMES = {
     "undefined",
     "none",
     "true",
-    "false"
+    "false",
+    "static",
+    "assets",
+    "config",
+    "settings",
+    "dashboard",
+    "adminpanel"
 }
 
 RESERVED_PATTERNS = re.compile(
