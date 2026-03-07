@@ -275,9 +275,12 @@ class UserProfileForm(FlaskForm):
             Optional(),
             Length(max=32, message="Real name cannot exceed 32 characters."),
             # Same as above but allows spaces
-            Regexp(r'^[a-zA-Z0-9äöüÄÖÜßéèêáàâíìîóòôúùûñÑçÇ\s.\-]+$', message="Real name contains invalid special characters.")
-        ],
-        ReservedUsername()
+            Regexp(
+                r'^[a-zA-Z0-9äöüÄÖÜßéèêáàâíìîóòôúùûñÑçÇ\s.\-]+$',
+                message="Real name contains invalid special characters."
+            ),
+            ReservedUsername()
+        ]
     )
     email = StringField(
         "E-Mail Address",
