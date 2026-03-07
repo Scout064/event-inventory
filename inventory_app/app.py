@@ -40,6 +40,48 @@ QR_DIR = os.path.join(APP_DIR, "static", "qr_codes")
 os.makedirs(QR_DIR, exist_ok=True)
 
 
+LEET_MAP = str.maketrans({
+    "0": "o",
+    "1": "i",
+    "3": "e",
+    "4": "a",
+    "5": "s",
+    "7": "t",
+    "@": "a",
+    "$": "s",
+    "!": "i"
+})
+
+
+RESERVED_USERNAMES = {
+    "admin",
+    "administrator",
+    "root",
+    "system",
+    "support",
+    "security",
+    # route / API conflicts
+    "login",
+    "logout",
+    "signup",
+    "register",
+    "api",
+    "user",
+    "users",
+    # technical / dangerous values
+    "null",
+    "undefined",
+    "none",
+    "true",
+    "false"
+}
+
+
+RESERVED_PATTERNS = re.compile(
+    r"(admin|administrator|root|superuser|sysadmin|moderator|staff|support|owner)"
+)
+
+
 def load_config():
     if not os.path.exists(CONFIG_PATH):
         return {"configured": False}
@@ -102,6 +144,17 @@ LAN_REGEX = re.compile(
 )
 
 
+def is_forbidden_username(username: str) -> bool:
+    normalized = normalize_username(username)
+    # exact match block
+    if normalized in RESERVED_USERNAMES:
+        return True
+    # admin-style keyword block
+    if RESERVED_PATTERNS.search(normalized):
+        return True
+    return False
+
+
 @app.before_request
 def enforce_https():
     cfg = load_config()
@@ -153,6 +206,14 @@ def find_user_by_id(user_id):
     if row:
         return User(*row)
     return None
+
+
+def normalize_username(username: str) -> str:
+    username = username.lower()
+    username = username.translate(LEET_MAP)
+    # remove separators
+    username = re.sub(r"[\W_]+", "", username)
+    return username
 
 
 @login_manager.user_loader
