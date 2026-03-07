@@ -857,6 +857,51 @@ def productions_remove(pid):
     return redirect(url_for("productions_view", pid=pid))
 
 
+@app.route("/productions/<int:pid>/clear", methods=["POST"])
+@login_required
+def productions_clear_all(pid):
+    """Removes every item assigned to a specific production."""
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("DELETE FROM production_items WHERE production_id = %s", (pid,))
+        conn.commit()
+        flash("All items removed from production.", "success")
+    except Exception as e:
+        conn.rollback()
+        flash(f"Error clearing items: {e}", "danger")
+    finally:
+        cur.close()
+        conn.close()
+    return redirect(url_for("productions_view", pid=pid))
+
+
+@app.route("/productions/<int:pid>/batch_remove", methods=["POST"])
+@login_required
+def productions_batch_remove(pid):
+    """Removes a list of selected items from the production."""
+    item_ids = request.form.getlist("item_ids")
+    if not item_ids:
+        flash("No items were selected for removal.", "warning")
+        return redirect(url_for("productions_view", pid=pid))
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        # Construct a query like: DELETE ... WHERE pid = %s AND inventory_id IN (%s, %s, %s)
+        format_strings = ','.join(['%s'] * len(item_ids))
+        query = f"DELETE FROM production_items WHERE production_id = %s AND inventory_id IN ({format_strings})"
+        cur.execute(query, [pid] + item_ids)
+        conn.commit()
+        flash(f"Successfully removed {len(item_ids)} items.", "success")
+    except Exception as e:
+        conn.rollback()
+        flash(f"Error during batch removal: {e}", "danger")
+    finally:
+        cur.close()
+        conn.close()
+    return redirect(url_for("productions_view", pid=pid))
+
+
 # QR label with logo in center
 def generate_qr_with_logo(data_text, logo_path=None, box_size=10, border=4):
     qr = qrcode.QRCode(
@@ -980,7 +1025,7 @@ def report_items_pdf():
     conn.close()
 
     bio = io.BytesIO()
-    c = canvas.Canvas(bio, pagesize=A4)
+    c = canvas.Canvas(bio, pagesize=A4, pageCompression=1)
     width, height = A4
     y = height - 20 * mm
     c.setFont("Helvetica-Bold", 14)
@@ -1022,7 +1067,7 @@ def report_production_pdf(pid):
     conn.close()
 
     bio = io.BytesIO()
-    c = canvas.Canvas(bio, pagesize=A4)
+    c = canvas.Canvas(bio, pagesize=A4, pageCompression=1)
     width, height = A4
     y = height - 20 * mm
     c.setFont("Helvetica-Bold", 14)
