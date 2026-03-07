@@ -9,7 +9,7 @@ import qrcode
 from PIL import Image, ImageDraw, ImageFont
 from flask import (
     Flask, render_template, request, redirect, url_for, flash,
-    send_file, abort, send_from_directory
+    send_file, abort, send_from_directory, jsonify
 )
 from flask_login import (
     LoginManager, login_user, logout_user,
@@ -423,7 +423,6 @@ def index():
 
 
 # Items
-# In app.py - Update the items route
 @app.route('/items')
 @login_required
 def items():
@@ -525,7 +524,6 @@ def items_edit(inventory_id):
         "manufacturer": row[5],
         "model": row[6],
     })
-
     if request.method == "POST" and form.validate_on_submit():
         try:
             # Update DB
@@ -539,14 +537,11 @@ def items_edit(inventory_id):
                          form.model.data.strip() if form.model.data else None,
                          inventory_id))
             conn.commit()
-
             flash("Item updated.", "success")
             return redirect(url_for("items"))
-
         except mariadb.Error as ex:
             conn.rollback()
             flash(f"Error: {ex}", "danger")
-
     cur.close()
     conn.close()
     return render_template("item_form.html", form=form, mode="edit")
@@ -663,6 +658,38 @@ def items_import():
         flash(msg, "success" if counts[2] == 0 and counts[3] == 0 else "warning")
         return redirect(url_for("items"))
     return render_template("items_import.html")
+
+
+@app.route("/items/search")
+@login_required
+def api_items_search():
+    """Server-side search for the TomSelect dropdown."""
+    q = request.args.get("q", "").strip()
+    # If the search query is empty, return an empty list
+    if not q:
+        return jsonify({"items": []})
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        # Search by ID or Name, limit to 50 so the frontend stays snappy
+        query = """
+            SELECT inventory_id, name
+            FROM items
+            WHERE inventory_id LIKE %s OR name LIKE %s
+            LIMIT 50
+        """
+        search_term = f"%{q}%"
+        cur.execute(query, (search_term, search_term))
+        results = cur.fetchall()
+        # Format the results as a list of dictionaries for JSON serialization
+        items = [{"id": r[0], "name": r[1]} for r in results]
+        return jsonify({"items": items})
+    except mariadb.Error as e:
+        print(f"Database error during search: {e}")
+        return jsonify({"items": []}), 500
+    finally:
+        cur.close()
+        conn.close()
 
 
 # Productions
