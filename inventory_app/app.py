@@ -978,6 +978,7 @@ def label_png(inventory_id):
     base_font_size = int(height_px * 0.08)
     min_font_size = 10
     # Function to compute block height for given font size
+
     def compute_block_height(f_size):
         return len(lines) * f_size + (len(lines) - 1) * int(f_size * 0.5)
     # Scale font size down if block is too tall
@@ -995,6 +996,7 @@ def label_png(inventory_id):
             font = ImageFont.truetype(font_path, size)
         draw.text((x, y), text, font=font, fill="black")
         y += size + int(size * 0.5)
+
     # Output PNG
     bio = io.BytesIO()
     label.save(bio, format="PNG")
