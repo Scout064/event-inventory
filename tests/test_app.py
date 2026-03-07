@@ -1,5 +1,6 @@
 from unittest.mock import patch
-import io, datetime
+import io
+import datetime
 
 
 @patch("inventory_app.app.load_config")
@@ -323,5 +324,3 @@ def test_add_production_success(mock_load, authenticated_client, mock_db):
             assert args[1] == expected_date
             assert args[2] == "Outdoor event notes"
     assert insert_called
-
-
