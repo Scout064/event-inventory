@@ -50,6 +50,21 @@ def test_add_item(mock_load, authenticated_client, mock_db):
 
 
 @patch("inventory_app.app.load_config")
+def test_edit_item_id_readonly(mock_load, authenticated_client, mock_db):
+    """Verifies that the inventory_id is marked as readonly on the edit page."""
+    mock_load.return_value = {"configured": True}
+    mock_cur = mock_db.cursor.return_value
+    # Mock finding the item to edit
+    mock_cur.fetchone.return_value = ("ACC-001", "Mic", "Audio", "Desc", "SN1", "Man", "Mod")
+
+    response = authenticated_client.get("/items/ACC-001/edit")
+    assert response.status_code == 200
+    # Check if the readonly attribute is rendered in the HTML for the ID field
+    assert b'readonly' in response.data
+    assert b'ACC-001' in response.data
+
+
+@patch("inventory_app.app.load_config")
 def test_item_label_png(mock_load, authenticated_client, mock_db):
     """Tests GET /labels/<id>.png generation."""
     mock_load.return_value = {"configured": True, "logo_path": None}
@@ -98,6 +113,27 @@ def test_inventory_pdf_report(mock_load, authenticated_client, mock_db):
     ]
     response = authenticated_client.get("/reports/items.pdf")
     assert response.status_code == 200
+    assert b"%PDF" in response.data
+
+
+@patch("inventory_app.app.load_config")
+def test_production_pdf_report_with_notes(mock_load, authenticated_client, mock_db):
+    """Tests the BOM PDF generation including the text wrap logic for long notes."""
+    mock_load.return_value = {"configured": True}
+    mock_cur = mock_db.cursor.return_value
+
+    # Mock production header (id, name, date, notes)
+    long_note = "A" * 150  # Create a long note to trigger wrapping
+    mock_cur.fetchone.return_value = (1, "Summer Festival", "2026-07-15", long_note)
+
+    # Mock items assigned to production
+    mock_cur.fetchall.return_value = [
+        ("ID1", "Item A", "Cat1", "SN-A", "MakeA", "ModA")
+    ]
+
+    response = authenticated_client.get("/reports/production/1.pdf")
+    assert response.status_code == 200
+    assert response.mimetype == "application/pdf"
     assert b"%PDF" in response.data
 
 
@@ -369,3 +405,28 @@ def test_add_production_success(mock_load, authenticated_client, mock_db):
             assert args[1] == expected_date
             assert args[2] == "Outdoor event notes"
     assert insert_called
+
+
+@patch("inventory_app.app.load_config")
+def test_productions_search(mock_load, authenticated_client, mock_db):
+    """Verifies that the productions list can be searched by name."""
+    mock_load.return_value = {"configured": True}
+    mock_cur = mock_db.cursor.return_value
+
+    mock_cur.fetchall.return_value = [
+        (1, "Target Festival", "2026-07-15", "Notes")
+    ]
+
+    response = authenticated_client.get("/productions?q=Target")
+    assert response.status_code == 200
+    assert b"Target Festival" in response.data
+
+    # Check if our SQL was called with the search term and wildcards
+    search_executed = False
+    for call in mock_cur.execute.call_args_list:
+        args = call[0]
+        if len(args) > 1 and "%Target%" in str(args[1]):
+            search_executed = True
+            break
+
+    assert search_executed, "The productions search SQL was never executed."
