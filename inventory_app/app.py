@@ -1276,18 +1276,17 @@ def profile():
 @app.route("/about")
 @login_required
 def about():
-#    version_path = os.path.join(APP_DIR, "version.json")
-    version_info = get_current_version()
+    version_path = os.path.join(APP_DIR, "version.json")
     version_string = "v0.0.0 (Unknown)"  # Default if file is missing
-#    if os.path.exists(version_path):
-#        try:
-#            with open(version_path, "r") as f:
-#                data = json.load(f)
-#                version_string = data.get("version", version_string)
+    if os.path.exists(version_path):
+        try:
+            with open(version_path, "r") as f:
+                data = json.load(f)
+                version_string = get_current_version()
             
-#        except Exception as e:
-#            print(f"Error reading version.json: {e}")
-    return render_template("about.html", currentVersion=version_info)
+        except Exception as e:
+            print(f"Error reading version.json: {e}")
+    return render_template("about.html", currentVersion=version_string)
 
 
 # Admin-only routes
