@@ -20,10 +20,30 @@
                 </span>
                 <span class="badge bg-primary fs-6">{{ currentVersion }}</span>
             </div>
-            <!-- GitHub Releases -->
-            <h6 class="text-uppercase text-muted mb-3">Available Releases</h6>
+            <!-- GitHub Stable Releases -->
+            <h6 class="text-uppercase text-muted mb-3">Available Stable Releases</h6>
             <ul class="list-group text-start">
                 {% for r in releases %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>{{ r.version }}</strong>
+                        {% if r.prerelease %}
+                            <span class="badge bg-warning text-dark ms-1">Beta</span>
+                        {% endif %}
+                        <div class="small text-muted">
+                            {{ r.published[:10] }}
+                        </div>
+                    </div>
+                    <a href="{{ r.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                        View
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+                        <!-- GitHub Beta Releases -->
+            <h6 class="text-uppercase text-muted mb-3">Available Beta Releases</h6>
+            <ul class="list-group text-start">
+                {% for r in beta %}
                 <li class="list-group-item d-flex justify-content-between align-items-center">
                     <div>
                         <strong>{{ r.version }}</strong>
