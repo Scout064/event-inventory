@@ -42,11 +42,20 @@
                     </div>
 
                     <hr>
+
+                    <div class="mb-3">
+                        {{ form.current_password.label(class="form-label") }}
+                        {{ form.current_password(class="form-control" + (" is-invalid" if form.current_password.errors else "")) }}
+                        <div class="form-text">You must enter your current password to set a new one.</div>
+                        {% for error in form.current_password.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
                     
                     <div class="mb-3">
                         {{ form.password.label(class="form-label") }}
                         {{ form.password(class="form-control" + (" is-invalid" if form.password.errors else "")) }}
-                        <div class="form-text">Only fill this out if you want to change your current password.</div>
+                        <div class="form-text">New password (leave blank to keep current).</div>
                         {% for error in form.password.errors %}
                             <div class="invalid-feedback d-block">{{ error }}</div>
                         {% endfor %}
