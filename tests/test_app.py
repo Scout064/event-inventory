@@ -141,7 +141,7 @@ def test_user_profile_update_success(mock_load, authenticated_client, mock_db):
     # Mock the DB response for the profile route's SELECT query
     # Matches: username, real_name, email, birthday, password_hash
     mock_cur.fetchone.return_value = (
-        "admin", "Admin User", "admin@example.com", "1990-01-01",
+        "admin", "Admin User", "admin@example.com", date(1990, 1, 1),
         generate_password_hash("oldpassword123")
     )
     response = authenticated_client.post(
