@@ -2,6 +2,7 @@ from unittest.mock import patch
 import io
 import datetime
 from werkzeug.security import generate_password_hash
+from datetime import date
 
 
 @patch("inventory_app.app.load_config")
