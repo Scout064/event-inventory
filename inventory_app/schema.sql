@@ -34,5 +34,10 @@ CREATE TABLE IF NOT EXISTS schema_version (
     version INT PRIMARY KEY
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS settings (
+    setting_key VARCHAR(64) PRIMARY KEY,
+    setting_value VARCHAR(255)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Initialize version if it's a fresh install
 INSERT IGNORE INTO schema_version (version) VALUES (1);
