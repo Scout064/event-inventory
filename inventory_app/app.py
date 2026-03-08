@@ -1282,7 +1282,7 @@ def about():
         try:
             version_string = get_current_version()
             stable_releases = get_github_releases()
-            beta_releases = get_latest_beta_releases(limit=5)
+            beta_releases = get_latest_beta_releases()
         except Exception as e:
             print(f"Error reading version.json: {e}")
     return render_template("about.html", currentVersion=version_string, releases=stable_releases, beta=beta_releases)
