@@ -33,7 +33,7 @@ from reportlab.lib.units import mm
 from reportlab.lib.utils import simpleSplit
 from inventory_app.security import ReservedUsername
 from inventory_app.version import (
-    get_github_releases, get_current_version, get_beta_releases,
+    get_current_version, get_beta_releases,
     get_stable_releases
 )
 
