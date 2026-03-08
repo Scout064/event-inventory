@@ -338,7 +338,21 @@ def create_users(cur, admin_data, default_data=None):
 @app.context_processor
 def inject_site_branding():
     cfg = load_config()
-    return dict(site_cfg=cfg)
+    site_cfg = {"site_name": cfg.get("site_name", "Inventory"), "logo_path": cfg.get("logo_path")}
+    # 3. Read persistent branding from database
+    conn = get_db()
+    if conn:
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT setting_key, setting_value FROM settings")
+            for row in cur.fetchall():
+                site_cfg[row[0]] = row[1]
+            cur.close()
+        except Exception:
+            pass  # Fails gracefully if DB isn't initialized yet
+        finally:
+            conn.close()
+    return dict(site_cfg=site_cfg)
 
 
 # --- Routes --- #
@@ -391,6 +405,9 @@ def setup():
             if form.default_user_username.data and form.default_user_password.data
             else None
         )
+        cur.execute("REPLACE INTO settings (setting_key, setting_value) VALUES ('site_name', 'Inventory')")
+        if logo_path:
+            cur.execute("REPLACE INTO settings (setting_key, setting_value) VALUES ('logo_path', %s)", (logo_path,))
         conn.commit()
         cur.close()
         conn.close()
@@ -1193,23 +1210,38 @@ def profile():
 @login_required
 @admin_required
 def admin_settings():
-    cfg = load_config()
+    conn = get_db()
+    cur = conn.cursor()
     if request.method == "POST":
-        cfg["site_name"] = request.form.get("site_name", "Event Inventory").strip()
-        if request.form.get("remove_logo"):
-            cfg["logo_path"] = None
+        # BACKEND LIMIT 2: max 32 characters
+        site_name = request.form.get("site_name", "Inventory").strip()
+        if len(site_name) > 32:
+            flash("Site name cannot exceed 32 characters.", "danger")
+            return redirect(url_for("admin_settings"))
+        # Write to Database
+        cur.execute("REPLACE INTO settings (setting_key, setting_value) VALUES ('site_name', %s)", (site_name,))
+        # Logo Logic
+        if request.form.get("remove_logo") == "yes":
+            cur.execute("REPLACE INTO settings (setting_key, setting_value) VALUES ('logo_path', NULL)")
         else:
             file = request.files.get("company_logo")
             if file and file.filename:
-                filename = secure_filename(file.filename)
-                ext = os.path.splitext(filename)[1].lower()
-                if ext in [".png", ".jpg", ".jpeg"]:
-                    logo_path = os.path.join(UPLOAD_DIR, "company_logo" + ext)
-                    file.save(logo_path)
-                    cfg["logo_path"] = logo_path
-        save_config(cfg)
-        flash("Branding updated.", "success")
+                try:
+                    # save_logo() acts as BACKEND LIMIT 1: It raises ValueError if not PNG/JPG
+                    logo_path = save_logo(file)
+                    cur.execute("REPLACE INTO settings (setting_key, setting_value) VALUES ('logo_path', %s)", (logo_path,))
+                except ValueError:
+                    flash("Invalid file type. Only PNG and JPEG images are allowed.", "danger")
+                    return redirect(url_for("admin_settings"))
+        conn.commit()
+        flash("Branding updated successfully.", "success")
         return redirect(url_for("admin_settings"))
+    # GET Request: Fetch settings to populate the form
+    cur.execute("SELECT setting_key, setting_value FROM settings")
+    rows = cur.fetchall()
+    cfg = {r[0]: r[1] for r in rows}
+    cur.close()
+    conn.close()
     return render_template("admin_settings.html", cfg=cfg)
 
 
