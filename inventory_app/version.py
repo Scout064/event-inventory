@@ -42,6 +42,7 @@ def get_stable_releases(limit=1):
     # Return only the latest 'limit' releases
     return stable_releases[:limit]
 
+
 def get_beta_releases(limit=5):
     releases = get_github_releases()
     beta_releases = [
