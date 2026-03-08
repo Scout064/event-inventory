@@ -32,7 +32,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 from reportlab.lib.utils import simpleSplit
 from inventory_app.security import ReservedUsername
-from inventory_app.version import get_github_release, get_current_version
+from inventory_app.version import get_github_releases, get_current_version
 
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
