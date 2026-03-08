@@ -10,7 +10,7 @@ venv_base = '/var/www/inventory/inventory_app/venv'
 try:
     pattern = os.path.join(venv_base, 'lib', 'python*', 'site-packages')
     venv_site_packages = glob.glob(pattern)[0]
-    
+
     if venv_site_packages not in sys.path:
         sys.path.insert(0, venv_site_packages)
 except IndexError:
