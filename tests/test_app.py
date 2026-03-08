@@ -428,5 +428,5 @@ def test_productions_search(mock_load, authenticated_client, mock_db):
         if len(args) > 1 and "%Target%" in str(args[1]):
             search_executed = True
             break
-    
+
     assert search_executed, "The productions search SQL was never executed."
