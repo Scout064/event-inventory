@@ -1112,22 +1112,24 @@ def report_production_pdf(pid):
     c.setFont("Helvetica-Bold", 10)
     c.drawString(margin_left, y, "Inventory ID | Item Name | Category | Details")
     y -= 2 * mm
-    c.line(margin_left, y, width - margin_left, y)  # Draw a separator line
+    c.line(margin_left, y, width - margin_left, y)
     y -= 6 * mm
-    c.setFont("Helvetica", 10)
     for r in items:
-        # Construct the detail string
-        item_text = f"{r[0]} | {r[1]} | {r[2] or ''} | SN:{r[3] or ''} | {r[4] or ''} {r[5] or ''}"
-        # Wrap item lines in case Name or Model are very long
+        # Construct text: ID | Name | Cat | SN | Manufacturer Model
+        details = f"SN:{r[3] or 'N/A'} | {r[4] or ''} {r[5] or ''}"
+        item_text = f"{r[0]} | {r[1]} | {r[2] or ''} | {details}"
         wrapped_item = simpleSplit(item_text, "Helvetica", 10, max_width)
-        for line in wrapped_item:
+        for i, line in enumerate(wrapped_item):
+            # Page overflow check
             if y < 20 * mm:
                 c.showPage()
                 y = height - 20 * mm
                 c.setFont("Helvetica", 10)
-            c.drawString(15 * mm, y, line)
+            # Indent subsequent lines of the same item for better readability
+            current_x = margin_left if i == 0 else margin_left + 4 * mm
+            c.drawString(current_x, y, line)
             y -= 5 * mm
-        y -= 2 * mm  # Small gap between different items
+        y -= 3 * mm  # Space between different items
     c.showPage()
     c.save()
     bio.seek(0)
