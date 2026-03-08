@@ -30,6 +30,7 @@ from werkzeug.utils import secure_filename
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
+from reportlab.lib.utils import simpleSplit
 from inventory_app.security import ReservedUsername
 
 
@@ -286,6 +287,7 @@ class UserProfileForm(FlaskForm):
         ]
     )
     birthday = DateField("Birthday", format='%Y-%m-%d', validators=[Optional()])
+    current_password = PasswordField("Current Password", validators=[Optional()])
     password = PasswordField("New Password (leave blank to keep current)", validators=[Optional(), Length(min=6)])
     confirm_password = PasswordField("Confirm New Password", validators=[EqualTo('password', message='Passwords must match')])
     submit = SubmitField("Save Profile")
@@ -1063,7 +1065,7 @@ def report_items_pdf():
 def report_production_pdf(pid):
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT id,name,date,notes FROM productions WHERE id=%s", (pid,))
+    cur.execute("SELECT id, name, date, notes FROM productions WHERE id=%s", (pid,))
     prod = cur.fetchone()
     if not prod:
         cur.close()
@@ -1080,25 +1082,54 @@ def report_production_pdf(pid):
     bio = io.BytesIO()
     c = canvas.Canvas(bio, pagesize=A4, pageCompression=1)
     width, height = A4
+    # Define margins and usable width
+    margin_left = 20 * mm
+    max_width = width - (margin_left * 2)
     y = height - 20 * mm
+    # Header
     c.setFont("Helvetica-Bold", 14)
-    c.drawString(20 * mm, y, f"BOM – {prod[1]}")
+    c.drawString(margin_left, y, f"BOM – {prod[1]}")
     y -= 8 * mm
     c.setFont("Helvetica", 10)
-    c.drawString(20 * mm, y, f"Date: {prod[2] or ''}")
-    y -= 6 * mm
+    c.drawString(margin_left, y, f"Date: {prod[2] or 'TBD'}")
+    y -= 8 * mm
+    # --- Dynamic Notes Section ---
     if prod[3]:
-        c.drawString(20 * mm, y, f"Notes: {prod[3][:90]}")
-        y -= 8 * mm
-    c.setFont("Helvetica", 10)
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(margin_left, y, "Notes:")
+        c.setFont("Helvetica", 10)
+        # Wrap the notes text to fit within max_width
+        note_lines = simpleSplit(prod[3], "Helvetica", 10, max_width)
+        for line in note_lines:
+            y -= 5 * mm
+            # Check for page end
+            if y < 20 * mm:
+                c.showPage()
+                y = height - 20 * mm
+            c.drawString(margin_left, y, line)
+        y -= 10 * mm  # Extra space after notes section
+    # --- Items List ---
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(margin_left, y, "Inventory ID | Item Name | Category | Details")
+    y -= 2 * mm
+    c.line(margin_left, y, width - margin_left, y)
+    y -= 6 * mm
     for r in items:
-        if y < 20 * mm:
-            c.showPage()
-            y = height - 20 * mm
-            c.setFont("Helvetica", 10)
-        line = f"{r[0]} | {r[1]} | {r[2] or ''} | SN:{r[3] or ''} | {r[4] or ''} {r[5] or ''}"
-        c.drawString(15 * mm, y, line[:120])
-        y -= 6 * mm
+        # Construct text: ID | Name | Cat | SN | Manufacturer Model
+        details = f"SN:{r[3] or 'N/A'} | {r[4] or ''} {r[5] or ''}"
+        item_text = f"{r[0]} | {r[1]} | {r[2] or ''} | {details}"
+        wrapped_item = simpleSplit(item_text, "Helvetica", 10, max_width)
+        for i, line in enumerate(wrapped_item):
+            # Page overflow check
+            if y < 20 * mm:
+                c.showPage()
+                y = height - 20 * mm
+                c.setFont("Helvetica", 10)
+            # Indent subsequent lines of the same item for better readability
+            current_x = margin_left if i == 0 else margin_left + 4 * mm
+            c.drawString(current_x, y, line)
+            y -= 5 * mm
+        y -= 3 * mm  # Space between different items
     c.showPage()
     c.save()
     bio.seek(0)
@@ -1148,63 +1179,71 @@ def search():
     )
 
 
+# Profile Helper function due to complexity
+def _execute_profile_update(cur, user_id, uname, rname, email, bday, pw_hash=None):
+    """Helper to handle the SQL update logic for the profile."""
+    if pw_hash:
+        query = """UPDATE users
+                   SET username=%s, real_name=%s, email=%s, birthday=%s, password_hash=%s
+                   WHERE id=%s"""
+        params = (uname, rname, email, bday, pw_hash, user_id)
+    else:
+        query = """UPDATE users
+                   SET username=%s, real_name=%s, email=%s, birthday=%s
+                   WHERE id=%s"""
+        params = (uname, rname, email, bday, user_id)
+    cur.execute(query, params)
+
+
 # User Profile Route
 @app.route("/profile", methods=["GET", "POST"])
 @login_required
 def profile():
     conn = get_db()
     cur = conn.cursor()
-    # Fetch current user's full data
-    cur.execute("SELECT username, real_name, email, birthday FROM users WHERE id=%s", (current_user.id,))
+    cur.execute("SELECT username, real_name, email, birthday, password_hash FROM users WHERE id=%s", (current_user.id,))
     row = cur.fetchone()
     if not row:
         cur.close()
         conn.close()
         abort(404)
     form = UserProfileForm()
-    # Pre-fill the form on GET request
+    # Handle GET request: Populate form
     if request.method == "GET":
-        form.username.data = row[0]
-        form.real_name.data = row[1]
-        form.email.data = row[2]
-        form.birthday.data = row[3]  # WTForms DateField handles the datetime.date object automatically
+        form.username.data, form.real_name.data, form.email.data, form.birthday.data = row[0], row[1], row[2], row[3]
+    # Handle POST request: Process update
     if form.validate_on_submit():
-        uname = form.username.data.strip()
-        rname = form.real_name.data.strip() if form.real_name.data else None
-        email = form.email.data.strip() if form.email.data else None
-        bday = form.birthday.data
         pw = form.password.data
+        current_pw = form.current_password.data
+        # Security Check: Validate current password if changing to a new one
+        if pw:
+            if not current_pw or not check_password_hash(row[4], current_pw):
+                flash("Current Password is required and must be correct to set a new password.", "danger")
+                return render_template("profile.html", form=form)
         try:
-            if pw:
-                # Update including new password
-                cur.execute("""UPDATE users
-                               SET username=%s, real_name=%s, email=%s, birthday=%s, password_hash=%s
-                               WHERE id=%s""",
-                            (uname, rname, email, bday, generate_password_hash(pw), current_user.id))
-            else:
-                # Update without changing password
-                cur.execute("""UPDATE users
-                               SET username=%s, real_name=%s, email=%s, birthday=%s
-                               WHERE id=%s""",
-                            (uname, rname, email, bday, current_user.id))
+            new_hash = generate_password_hash(pw) if pw else None
+            _execute_profile_update(
+                cur, current_user.id,
+                form.username.data.strip(),
+                form.real_name.data.strip() if form.real_name.data else None,
+                form.email.data.strip() if form.email.data else None,
+                form.birthday.data,
+                new_hash
+            )
             conn.commit()
-            # Keep the flask-login session in sync if they changed their username
-            current_user.username = uname
+            current_user.username = form.username.data.strip()
             flash("Profile updated successfully.", "success")
             return redirect(url_for("profile"))
         except mariadb.Error as e:
             conn.rollback()
-            # Handle duplicate username or email gracefully
-            if "Duplicate entry" in str(e):
-                flash("That Username or E-Mail is already in use by another account.", "danger")
-            else:
-                flash(f"Database Error: {e}", "danger")
+            flash("Username or E-Mail already in use." if "Duplicate entry" in str(e) else f"Database Error: {e}", "danger")
     cur.close()
     conn.close()
     return render_template("profile.html", form=form)
 
 
 # Admin-only routes
+
 
 @app.route("/admin/settings", methods=["GET", "POST"])
 @login_required
