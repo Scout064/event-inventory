@@ -4,6 +4,8 @@ from pathlib import Path
 
 GITHUB_OWNER = "Scout064"
 GITHUB_REPO = "event-inventory"
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+VERSION_PATH = os.path.join(APP_DIR, "version.json")
 
 
 def get_github_releases():
@@ -26,5 +28,5 @@ def get_github_releases():
 
 def get_current_version():
     path = Path("version.json")
-    with open(path, "r", encoding="utf-8") as f:
+    with open(VERSION_PATH, "r", encoding="utf-8") as f:
         return json.load(f)
