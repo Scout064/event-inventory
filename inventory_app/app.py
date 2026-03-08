@@ -720,13 +720,26 @@ def api_items_search():
 @app.route("/productions")
 @login_required
 def productions():
+    q = request.args.get("q", "").strip()
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT id,name,date,notes FROM productions ORDER BY date DESC, name ASC")
+    if q:
+        search_term = f"%{q}%"
+        # Search across ID, Name, and Notes
+        cur.execute("""
+            SELECT id, name, date, notes
+            FROM productions
+            WHERE id LIKE %s OR name LIKE %s OR notes LIKE %s
+            ORDER BY date DESC
+        """, (search_term, search_term, search_term))
+    else:
+        # Default load: sort by date descending
+        cur.execute("SELECT id, name, date, notes FROM productions ORDER BY date DESC")
     rows = cur.fetchall()
     cur.close()
     conn.close()
-    return render_template("productions.html", rows=rows)
+    # Pass the 'q' parameter back to the template so the search bar keeps its value
+    return render_template("productions.html", rows=rows, q=q)
 
 
 @app.route("/productions/new", methods=["GET", "POST"])
