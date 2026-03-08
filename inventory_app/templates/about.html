@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5">
+    <div class="card shadow-sm mx-auto" style="max-width: 500px;">
+        <div class="card-header bg-dark text-white text-center py-3">
+            <h4 class="mb-0">About Inventory System</h4>
+        </div>
+        <div class="card-body text-center py-5">
+            <div class="mb-3">
+                <i class="bi bi-info-circle-fill text-primary" style="font-size: 3rem;"></i>
+            </div>
+            <h5 class="card-title">System Information</h5>
+            <p class="card-text text-muted mb-4">
+                This application is used for managing equipment inventory, 
+                labels, and production tracking.
+            </p>
+            <div class="p-3 bg-light rounded">
+                <span class="text-secondary small text-uppercase fw-bold d-block mb-1">Current Version</span>
+                <span class="badge bg-primary fs-6">{{ version }}</span>
+            </div>
+        </div>
+        <div class="card-footer text-muted text-center small py-2">
+            © 2026 Your Organization
+        </div>
+    </div>
+</div>
+{% endblock %}
