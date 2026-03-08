@@ -5,6 +5,7 @@ import io
 import mariadb
 import qrcode
 import csv
+import psutil
 from functools import wraps
 from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
@@ -32,6 +33,10 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 from reportlab.lib.utils import simpleSplit
 from inventory_app.security import ReservedUsername
+from inventory_app.version import (
+    get_current_version, get_beta_releases,
+    get_stable_releases
+)
 
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -1270,6 +1275,59 @@ def profile():
     cur.close()
     conn.close()
     return render_template("profile.html", form=form)
+
+
+@app.route("/about")
+@login_required
+def about():
+    version_path = os.path.join(APP_DIR, "version.json")
+    version_string = "v0.0.0 (Unknown)"  # Default if file is missing
+    stable_releases = []
+    beta_releases = []
+    stats = None
+    if os.path.exists(version_path):
+        try:
+            version_string = get_current_version()
+            stable_releases = get_stable_releases()
+            beta_releases = get_beta_releases(limit=5)
+        except Exception as e:
+            print(f"Error reading version.json: {e}")
+    # --- NEW: Fetch Server Stats if Admin ---
+    if getattr(current_user, "is_admin", False):
+        stats = {
+            "cpu_percent": psutil.cpu_percent(interval=0.1),
+            "ram_percent": psutil.virtual_memory().percent,
+            "ram_total": round(psutil.virtual_memory().total / (1024 ** 3), 2),  # in GB
+            "disk_percent": psutil.disk_usage('/').percent,
+            "disk_total": round(psutil.disk_usage('/').total / (1024 ** 3), 2),  # in GB
+            "db_size": "Unknown"
+        }
+        # Calculate Database Size
+        conn = get_db()
+        if conn:
+            try:
+                cur = conn.cursor()
+                # Query MariaDB for the size of the specific database
+                cur.execute("""
+                    SELECT SUM(data_length + index_length) / 1024 / 1024
+                    FROM information_schema.tables
+                    WHERE table_schema = DATABASE()
+                """)
+                size_mb = cur.fetchone()[0]
+                if size_mb:
+                    stats["db_size"] = f"{round(size_mb, 2)} MB"
+                cur.close()
+            except Exception as e:
+                print(f"Error fetching DB size: {e}")
+            finally:
+                conn.close()
+    return render_template(
+        "about.html",
+        currentVersion=version_string,
+        releases=stable_releases,
+        beta=beta_releases,
+        stats=stats  # Pass stats to template
+    )
 
 
 # Admin-only routes
