@@ -1,6 +1,7 @@
 from unittest.mock import patch
 import io
 import datetime
+from werkzeug.security import generate_password_hash
 
 
 @patch("inventory_app.app.load_config")
@@ -133,8 +134,15 @@ def test_admin_view_user_list(mock_load, authenticated_client, mock_db):
 
 @patch("inventory_app.app.load_config")
 def test_user_profile_update_success(mock_load, authenticated_client, mock_db):
-    """Tests that a user can update their profile with matching passwords."""
+    """Tests that a user can update their profile with matching passwords and correct current password."""
     mock_load.return_value = {"configured": True}
+    mock_cur = mock_db.cursor.return_value
+    # Mock the DB response for the profile route's SELECT query
+    # Matches: username, real_name, email, birthday, password_hash
+    mock_cur.fetchone.return_value = (
+        "admin", "Admin User", "admin@example.com", "1990-01-01",
+        generate_password_hash("oldpassword123")
+    )
     response = authenticated_client.post(
         "/profile",
         data={
@@ -142,13 +150,40 @@ def test_user_profile_update_success(mock_load, authenticated_client, mock_db):
             "real_name": "Admin User",
             "email": "admin@example.com",
             "birthday": "1990-01-01",
+            "current_password": "oldpassword123",  # Satisfies the new security requirement
             "password": "newpassword123",
-            "confirm_password": "newpassword123"  # Must match 'password'
+            "confirm_password": "newpassword123",
+            "submit": "Save Profile"
         },
         follow_redirects=True
     )
     assert response.status_code == 200
     assert b"Profile updated successfully." in response.data
+
+
+@patch("inventory_app.app.load_config")
+def test_user_profile_update_wrong_current_password(mock_load, authenticated_client, mock_db):
+    """Tests that a password update fails if the current password is wrong."""
+    mock_load.return_value = {"configured": True}
+    mock_cur = mock_db.cursor.return_value
+    # Mock the DB response with a known hash
+    mock_cur.fetchone.return_value = (
+        "admin", "Admin User", "admin@example.com", "1990-01-01",
+        generate_password_hash("actualpassword123")
+    )
+    response = authenticated_client.post(
+        "/profile",
+        data={
+            "username": "admin",
+            "current_password": "WRONGpassword999",  # Wrong password!
+            "password": "newpassword123",
+            "confirm_password": "newpassword123",
+            "submit": "Save Profile"
+        },
+        follow_redirects=True
+    )
+    # Verify the form caught the error
+    assert b"Current Password is required and must be correct" in response.data
 
 
 @patch("inventory_app.app.load_config")
