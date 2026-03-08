@@ -9,7 +9,13 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS real_name VARCHAR(255);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255) UNIQUE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS birthday DATE;
 
+-- VERSION 3: Settings Table
+CREATE TABLE IF NOT EXISTS settings (
+    setting_key VARCHAR(64) PRIMARY KEY,
+    setting_value VARCHAR(255)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ALWAYS AT THE END: Update to the latest version
 -- We use INSERT to ensure the version is recorded, 
 -- and the update.sh script cleans up older rows.
-INSERT INTO schema_version (version) VALUES (2);
+INSERT INTO schema_version (version) VALUES (3);
