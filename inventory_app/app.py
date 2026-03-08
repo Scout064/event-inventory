@@ -5,6 +5,7 @@ import io
 import mariadb
 import qrcode
 import csv
+import requests
 from functools import wraps
 from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
@@ -32,6 +33,8 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 from reportlab.lib.utils import simpleSplit
 from inventory_app.security import ReservedUsername
+from inventory_app.version import get_github_release, get_current_version
+from pathlib import Path
 
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -1278,13 +1281,14 @@ def about():
     version_path = os.path.join(APP_DIR, "version.json")
     version_string = "v0.0.0 (Unknown)"  # Default if file is missing
     if os.path.exists(version_path):
-        try:
-            with open(version_path, "r") as f:
-                data = json.load(f)
-                version_string = data.get("version", version_string)
+#        try:
+#            with open(version_path, "r") as f:
+#                data = json.load(f)
+#                version_string = data.get("version", version_string)
+            
         except Exception as e:
             print(f"Error reading version.json: {e}")
-    return render_template("about.html", version=version_string)
+    return render_template("about.html", currentVersion=get_current_version)
 
 
 # Admin-only routes
