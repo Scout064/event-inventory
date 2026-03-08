@@ -1153,13 +1153,13 @@ def search():
 def _execute_profile_update(cur, user_id, uname, rname, email, bday, pw_hash=None):
     """Helper to handle the SQL update logic for the profile."""
     if pw_hash:
-        query = """UPDATE users 
-                   SET username=%s, real_name=%s, email=%s, birthday=%s, password_hash=%s 
+        query = """UPDATE users
+                   SET username=%s, real_name=%s, email=%s, birthday=%s, password_hash=%s
                    WHERE id=%s"""
         params = (uname, rname, email, bday, pw_hash, user_id)
     else:
-        query = """UPDATE users 
-                   SET username=%s, real_name=%s, email=%s, birthday=%s 
+        query = """UPDATE users
+                   SET username=%s, real_name=%s, email=%s, birthday=%s
                    WHERE id=%s"""
         params = (uname, rname, email, bday, user_id)
     cur.execute(query, params)
