@@ -30,6 +30,7 @@ from werkzeug.utils import secure_filename
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
+from reportlab.lib.utils import simpleSplit
 from inventory_app.security import ReservedUsername
 
 
@@ -1064,7 +1065,7 @@ def report_items_pdf():
 def report_production_pdf(pid):
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT id,name,date,notes FROM productions WHERE id=%s", (pid,))
+    cur.execute("SELECT id, name, date, notes FROM productions WHERE id=%s", (pid,))
     prod = cur.fetchone()
     if not prod:
         cur.close()
@@ -1081,25 +1082,52 @@ def report_production_pdf(pid):
     bio = io.BytesIO()
     c = canvas.Canvas(bio, pagesize=A4, pageCompression=1)
     width, height = A4
+    # Define margins and usable width
+    margin_left = 20 * mm
+    max_width = width - (margin_left * 2)
     y = height - 20 * mm
+    # Header
     c.setFont("Helvetica-Bold", 14)
-    c.drawString(20 * mm, y, f"BOM – {prod[1]}")
+    c.drawString(margin_left, y, f"BOM – {prod[1]}")
     y -= 8 * mm
     c.setFont("Helvetica", 10)
-    c.drawString(20 * mm, y, f"Date: {prod[2] or ''}")
-    y -= 6 * mm
+    c.drawString(margin_left, y, f"Date: {prod[2] or 'TBD'}")
+    y -= 8 * mm
+    # --- Dynamic Notes Section ---
     if prod[3]:
-        c.drawString(20 * mm, y, f"Notes: {prod[3][:90]}")
-        y -= 8 * mm
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(margin_left, y, "Notes:")
+        c.setFont("Helvetica", 10)
+        # Wrap the notes text to fit within max_width
+        note_lines = simpleSplit(prod[3], "Helvetica", 10, max_width)
+        for line in note_lines:
+            y -= 5 * mm
+            # Check for page end
+            if y < 20 * mm:
+                c.showPage()
+                y = height - 20 * mm
+            c.drawString(margin_left, y, line)
+        y -= 10 * mm # Extra space after notes section
+    # --- Items List ---
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(margin_left, y, "Inventory ID | Item Name | Category | Details")
+    y -= 2 * mm
+    c.line(margin_left, y, width - margin_left, y)  # Draw a separator line
+    y -= 6 * mm
     c.setFont("Helvetica", 10)
     for r in items:
-        if y < 20 * mm:
-            c.showPage()
-            y = height - 20 * mm
-            c.setFont("Helvetica", 10)
-        line = f"{r[0]} | {r[1]} | {r[2] or ''} | SN:{r[3] or ''} | {r[4] or ''} {r[5] or ''}"
-        c.drawString(15 * mm, y, line[:120])
-        y -= 6 * mm
+        # Construct the detail string
+        item_text = f"{r[0]} | {r[1]} | {r[2] or ''} | SN:{r[3] or ''} | {r[4] or ''} {r[5] or ''}"
+        # Wrap item lines in case Name or Model are very long
+        wrapped_item = simpleSplit(item_text, "Helvetica", 10, max_width)
+        for line in wrapped_item:
+            if y < 20 * mm:
+                c.showPage()
+                y = height - 20 * mm
+                c.setFont("Helvetica", 10)
+            c.drawString(15 * mm, y, line)
+            y -= 5 * mm
+        y -= 2 * mm  # Small gap between different items
     c.showPage()
     c.save()
     bio.seek(0)
