@@ -1149,13 +1149,28 @@ def search():
     )
 
 
+# Profile Helper function due to complexity
+def _execute_profile_update(cur, user_id, uname, rname, email, bday, pw_hash=None):
+    """Helper to handle the SQL update logic for the profile."""
+    if pw_hash:
+        query = """UPDATE users 
+                   SET username=%s, real_name=%s, email=%s, birthday=%s, password_hash=%s 
+                   WHERE id=%s"""
+        params = (uname, rname, email, bday, pw_hash, user_id)
+    else:
+        query = """UPDATE users 
+                   SET username=%s, real_name=%s, email=%s, birthday=%s 
+                   WHERE id=%s"""
+        params = (uname, rname, email, bday, user_id)
+    cur.execute(query, params)
+
+
 # User Profile Route
 @app.route("/profile", methods=["GET", "POST"])
 @login_required
 def profile():
     conn = get_db()
     cur = conn.cursor()
-    # Fetch current user's full data AND password hash
     cur.execute("SELECT username, real_name, email, birthday, password_hash FROM users WHERE id=%s", (current_user.id,))
     row = cur.fetchone()
     if not row:
@@ -1163,51 +1178,38 @@ def profile():
         conn.close()
         abort(404)
     form = UserProfileForm()
+    # Handle GET request: Populate form
     if request.method == "GET":
-        form.username.data = row[0]
-        form.real_name.data = row[1]
-        form.email.data = row[2]
-        form.birthday.data = row[3]
+        form.username.data, form.real_name.data, form.email.data, form.birthday.data = row[0], row[1], row[2], row[3]
+    # Handle POST request: Process update
     if form.validate_on_submit():
-        uname = form.username.data.strip()
-        rname = form.real_name.data.strip() if form.real_name.data else None
-        email = form.email.data.strip() if form.email.data else None
-        bday = form.birthday.data
         pw = form.password.data
         current_pw = form.current_password.data
-        # NEW: Validate current password if they are trying to change it
+        # Security Check: Validate current password if changing to a new one
         if pw:
-            if not current_pw:
-                flash("You must enter your Current Password to set a new password.", "danger")
-                return render_template("profile.html", form=form)
-            if not check_password_hash(row[4], current_pw):
-                flash("Current Password is incorrect.", "danger")
+            if not current_pw or not check_password_hash(row[4], current_pw):
+                flash("Current Password is required and must be correct to set a new password.", "danger")
                 return render_template("profile.html", form=form)
         try:
-            if pw:
-                cur.execute("""UPDATE users
-                               SET username=%s, real_name=%s, email=%s, birthday=%s, password_hash=%s
-                               WHERE id=%s""",
-                            (uname, rname, email, bday, generate_password_hash(pw), current_user.id))
-            else:
-                cur.execute("""UPDATE users
-                               SET username=%s, real_name=%s, email=%s, birthday=%s
-                               WHERE id=%s""",
-                            (uname, rname, email, bday, current_user.id))
+            new_hash = generate_password_hash(pw) if pw else None
+            _execute_profile_update(
+                cur, current_user.id,
+                form.username.data.strip(),
+                form.real_name.data.strip() if form.real_name.data else None,
+                form.email.data.strip() if form.email.data else None,
+                form.birthday.data,
+                new_hash
+            )
             conn.commit()
-            current_user.username = uname
+            current_user.username = form.username.data.strip()
             flash("Profile updated successfully.", "success")
             return redirect(url_for("profile"))
         except mariadb.Error as e:
             conn.rollback()
-            if "Duplicate entry" in str(e):
-                flash("That Username or E-Mail is already in use by another account.", "danger")
-            else:
-                flash(f"Database Error: {e}", "danger")
+            flash("Username or E-Mail already in use." if "Duplicate entry" in str(e) else f"Database Error: {e}", "danger")
     cur.close()
     conn.close()
     return render_template("profile.html", form=form)
-
 
 # Admin-only routes
 
