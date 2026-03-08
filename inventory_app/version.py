@@ -31,13 +31,20 @@ def get_github_releases():
 
 
 def get_beta_releases(limit=5):
-    releases = get_github_releases()
-    beta_releases = [
-        r for r in releases
-        if r["prerelease"] and not r["draft"]
-    ]
-    # Optionally sort by published date descending
-    beta_releases.sort(key=lambda r: r["published"], reverse=True)
+    url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases"
+    response = requests.get(url, timeout=10)
+    response.raise_for_status()
+    beta_releases = []
+    for r in response.json():
+        releases.append({
+            "name": r["name"],
+            "tag": r["tag_name"],
+            "version": r["tag_name"],
+            "prerelease": r["prerelease"],
+            "draft": r["draft"],
+            "published": r["published_at"],
+            "url": r["html_url"]
+        })
     return beta_releases[:limit]
 
 
