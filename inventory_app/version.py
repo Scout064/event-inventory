@@ -5,6 +5,7 @@ from pathlib import Path
 GITHUB_OWNER = "Scout064"
 GITHUB_REPO = "event-inventory"
 
+
 def get_github_releases():
     url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases"
     response = requests.get(url, timeout=10)
