@@ -30,7 +30,7 @@ def get_github_releases():
     return releases
 
 
-def get_latest_beta_releases(limit=5):
+def get_beta_releases(limit=5):
     releases = get_github_releases()
     beta_releases = [
         r for r in releases
