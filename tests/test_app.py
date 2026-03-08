@@ -69,7 +69,7 @@ def test_items_search_query(mock_load, authenticated_client, mock_db):
     # Mock return values for pagination and results
     mock_cur.fetchone.return_value = (1,)
     mock_cur.fetchall.return_value = [("ID1", "SearchTarget", "Cat", "SN", "Man", "Mod")]
-    
+
     response = authenticated_client.get("/items?q=SearchTarget")
     assert response.status_code == 200
 
@@ -82,7 +82,7 @@ def test_items_search_query(mock_load, authenticated_client, mock_db):
         if len(args) > 1 and "%SearchTarget%" in str(args[1]):
             search_executed = True
             break
-            
+
     assert search_executed, "The search SQL with wildcards was never executed."
 
 
