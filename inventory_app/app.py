@@ -499,6 +499,20 @@ def items():
     )
 
 
+def get_item_suggestions():
+    """Helper to fetch distinct values for autocomplete suggestions."""
+    conn = get_db()
+    cur = conn.cursor()
+    suggestions = {}
+    for field in ['category', 'manufacturer', 'model']:
+        # Fetch non-empty distinct values
+        cur.execute(f"SELECT DISTINCT {field} FROM items WHERE {field} IS NOT NULL AND {field} != '' ORDER BY {field}")
+        suggestions[field] = [row[0] for row in cur.fetchall()]
+    cur.close()
+    conn.close()
+    return suggestions
+
+
 @app.route("/items/new", methods=["GET", "POST"])
 @login_required
 def items_new():
@@ -523,7 +537,9 @@ def items_new():
         finally:
             cur.close()
             conn.close()
-    return render_template("item_form.html", form=form, mode="new")
+    # Fetch suggestions for the datalists on GET or failed validation
+    suggestions = get_item_suggestions()
+    return render_template("item_form.html", form=form, mode="new", suggestions=suggestions)
 
 
 @app.route("/items/<inventory_id>/edit", methods=["GET", "POST"])
@@ -538,7 +554,7 @@ def items_edit(inventory_id):
         cur.close()
         conn.close()
         abort(404)
-
+    # Pre-fill form with existing data
     form = ItemForm(data={
         "inventory_id": row[0],
         "name": row[1],
@@ -550,7 +566,6 @@ def items_edit(inventory_id):
     })
     if request.method == "POST" and form.validate_on_submit():
         try:
-            # Update DB
             cur.execute("""UPDATE items SET name=%s, category=%s, description=%s, serial_number=%s,
                            manufacturer=%s, model=%s WHERE inventory_id=%s""",
                         (form.name.data.strip(),
@@ -566,9 +581,11 @@ def items_edit(inventory_id):
         except mariadb.Error as ex:
             conn.rollback()
             flash(f"Error: {ex}", "danger")
+    # Fetch suggestions for the datalists
+    suggestions = get_item_suggestions()
     cur.close()
     conn.close()
-    return render_template("item_form.html", form=form, mode="edit")
+    return render_template("item_form.html", form=form, mode="edit", suggestions=suggestions)
 
 
 @app.route("/items/<inventory_id>/delete", methods=["POST"])
