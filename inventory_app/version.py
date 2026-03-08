@@ -30,6 +30,17 @@ def get_github_releases():
     return releases
 
 
+def get_latest_beta_releases(limit=5):
+    releases = get_github_releases()
+    beta_releases = [
+        r for r in releases
+        if r["prerelease"] and not r["draft"]
+    ]
+    # Optionally sort by published date descending
+    beta_releases.sort(key=lambda r: r["published"], reverse=True)
+    return beta_releases[:limit]
+
+
 def get_current_version():
     with open(VERSION_PATH, "r", encoding="utf-8") as f:
         data = json.load(f)
