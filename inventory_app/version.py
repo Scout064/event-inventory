@@ -2,6 +2,8 @@ import requests
 import json
 import os
 from pathlib import Path
+from functools import lru_cache
+
 
 GITHUB_OWNER = "Scout064"
 GITHUB_REPO = "event-inventory"
@@ -9,6 +11,7 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 VERSION_PATH = os.path.join(APP_DIR, "version.json")
 
 
+@lru_cache(maxsize=1)
 def get_github_releases():
     url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases"
     response = requests.get(url, timeout=10)
