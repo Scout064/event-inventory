@@ -26,5 +26,4 @@ def get_github_releases():
 def get_curret_version():
     path = Path("version.json")
     with open(path, "r", encoding="utf-8") as f:
-        currentVersion = json.load(f)
-    return currentVersion["version"]
+        return json.load(f)
