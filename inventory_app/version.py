@@ -30,6 +30,18 @@ def get_github_releases():
     return releases
 
 
+def get_stable_releases(limit=1):
+    releases = get_github_releases()
+    # Filter only stable releases (prerelease=False and draft=False)
+    stable_releases = [
+        r for r in releases
+        if not r["prerelease"] and not r["draft"]
+    ]
+    # Sort by published date descending (newest first)
+    stable_releases.sort(key=lambda r: r["published"], reverse=True)
+    # Return only the latest 'limit' releases
+    return stable_releases[:limit]
+
 def get_beta_releases(limit=5):
     releases = get_github_releases()
     beta_releases = [
