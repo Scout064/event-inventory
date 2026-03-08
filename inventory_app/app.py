@@ -1107,7 +1107,7 @@ def report_production_pdf(pid):
                 c.showPage()
                 y = height - 20 * mm
             c.drawString(margin_left, y, line)
-        y -= 10 * mm # Extra space after notes section
+        y -= 10 * mm  # Extra space after notes section
     # --- Items List ---
     c.setFont("Helvetica-Bold", 10)
     c.drawString(margin_left, y, "Inventory ID | Item Name | Category | Details")
