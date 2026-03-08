@@ -32,7 +32,10 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 from reportlab.lib.utils import simpleSplit
 from inventory_app.security import ReservedUsername
-from inventory_app.version import get_github_releases, get_current_version, get_beta_releases
+from inventory_app.version import (
+    get_github_releases, get_current_version, get_beta_releases,
+    get_stable_release
+)
 
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -1283,7 +1286,7 @@ def about():
     if os.path.exists(version_path):
         try:
             version_string = get_current_version()
-            stable_releases = get_github_releases()
+            stable_releases = get_stable_releases()
             beta_releases = get_latest_beta_releases(limit=5)
         except Exception as e:
             print(f"Error reading version.json: {e}")
