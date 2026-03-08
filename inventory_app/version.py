@@ -1,5 +1,6 @@
 import requests
 import json
+import os
 from pathlib import Path
 
 GITHUB_OWNER = "Scout064"
