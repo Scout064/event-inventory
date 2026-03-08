@@ -1280,10 +1280,7 @@ def about():
     version_string = "v0.0.0 (Unknown)"  # Default if file is missing
     if os.path.exists(version_path):
         try:
-            with open(version_path, "r") as f:
-                data = json.load(f)
-                version_string = get_current_version()
-            
+            version_string = get_current_version()
         except Exception as e:
             print(f"Error reading version.json: {e}")
     return render_template("about.html", currentVersion=version_string)
