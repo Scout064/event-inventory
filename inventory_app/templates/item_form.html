@@ -27,18 +27,19 @@
           pattern=".*\\S.*", 
           title="Name cannot be empty or only spaces."
       ) }}
-      {% if form.name.errors %}
-        {% for error in form.name.errors %}
-          <div class="invalid-feedback">{{ error }}</div>
-        {% endfor %}
-      {% else %}
-        <div class="invalid-feedback">Please provide a valid name (not just spaces).</div>
-      {% endif %}
+      {% for error in form.name.errors %}
+        <div class="invalid-feedback">{{ error }}</div>
+      {% endfor %}
     </div>
 
     <div class="col-md-4">
       <label class="form-label">Category</label>
-      {{ form.category(class="form-control is-invalid" if form.category.errors else "form-control", maxlength="50") }}
+      {{ form.category(class="form-control is-invalid" if form.category.errors else "form-control", maxlength="50", list="category_list", autocomplete="off") }}
+      <datalist id="category_list">
+        {% for val in suggestions.category %}
+          <option value="{{ val }}">
+        {% endfor %}
+      </datalist>
       {% for error in form.category.errors %}
         <div class="invalid-feedback">{{ error }}</div>
       {% endfor %}
@@ -46,7 +47,12 @@
 
     <div class="col-md-4">
       <label class="form-label">Manufacturer</label>
-      {{ form.manufacturer(class="form-control is-invalid" if form.manufacturer.errors else "form-control", maxlength="50") }}
+      {{ form.manufacturer(class="form-control is-invalid" if form.manufacturer.errors else "form-control", maxlength="50", list="manufacturer_list", autocomplete="off") }}
+      <datalist id="manufacturer_list">
+        {% for val in suggestions.manufacturer %}
+          <option value="{{ val }}">
+        {% endfor %}
+      </datalist>
       {% for error in form.manufacturer.errors %}
         <div class="invalid-feedback">{{ error }}</div>
       {% endfor %}
@@ -54,7 +60,12 @@
 
     <div class="col-md-4">
       <label class="form-label">Model</label>
-      {{ form.model(class="form-control is-invalid" if form.model.errors else "form-control", maxlength="50") }}
+      {{ form.model(class="form-control is-invalid" if form.model.errors else "form-control", maxlength="50", list="model_list", autocomplete="off") }}
+      <datalist id="model_list">
+        {% for val in suggestions.model %}
+          <option value="{{ val }}">
+        {% endfor %}
+      </datalist>
       {% for error in form.model.errors %}
         <div class="invalid-feedback">{{ error }}</div>
       {% endfor %}
