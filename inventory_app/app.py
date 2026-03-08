@@ -1278,6 +1278,8 @@ def profile():
 def about():
     version_path = os.path.join(APP_DIR, "version.json")
     version_string = "v0.0.0 (Unknown)"  # Default if file is missing
+    stable_releases = []
+    beta_releases = []
     if os.path.exists(version_path):
         try:
             version_string = get_current_version()
