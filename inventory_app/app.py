@@ -1211,7 +1211,9 @@ def profile():
     conn.close()
     return render_template("profile.html", form=form)
 
+
 # Admin-only routes
+
 
 @app.route("/admin/settings", methods=["GET", "POST"])
 @login_required
