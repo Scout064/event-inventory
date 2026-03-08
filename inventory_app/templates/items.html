@@ -44,7 +44,7 @@
         <h5 class="modal-title" id="importModalLabel">Bulk Import Items</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <form action="{{ url_for('items_import') }}" method="post" enctype="multipart/form-data">
+      <form id="importForm" action="{{ url_for('items_import') }}" method="post" enctype="multipart/form-data">
         <div class="modal-body">
           <p class="text-muted small">Upload a CSV file using the standard template. Existing Inventory IDs will be updated with the new values provided in the file.</p>
           <div class="mb-3">
@@ -122,6 +122,19 @@
 {% endif %}
 
 <script>
+  // Prevents multiple clicks on the CSV import button
+  document.getElementById('importForm').addEventListener('submit', function() {
+    const btn = document.getElementById('importBtn');
+    
+    // Disable the button to prevent double-submission
+    btn.disabled = true;
+    
+    // Optional: Add a loading spinner and change text for better UX
+    btn.innerHTML = `
+      <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+      Importing...
+    `;
+  });
   // TABLE SORT LOGIC (remains frontend-only for the current page of 100 items)
   function sortTable(n) {
     const table = document.getElementById("inventoryTable");
