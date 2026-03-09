@@ -49,10 +49,14 @@ def create_label_image(inventory_id_val, name, category, serial, manufacturer, m
     font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 
     lines = []
-    if inventory_id_val: lines.append(inventory_id_val)
-    if name or category: lines.append(f"{name} ({category})" if category else name)
-    if serial: lines.append(f"SN: {serial}")
-    if manufacturer or model: lines.append(f"{manufacturer} {model}".strip())
+    if inventory_id_val:
+        lines.append(inventory_id_val)
+    if name or category:
+        lines.append(f"{name} ({category})" if category else name)
+    if serial:
+        lines.append(f"SN: {serial}")
+    if manufacturer or model:
+        lines.append(f"{manufacturer} {model}".strip())
 
     x = qr_size + int(height_px * 0.1)
     y_start = int(height_px * 0.12)
