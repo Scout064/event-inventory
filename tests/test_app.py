@@ -104,65 +104,71 @@ def test_items_search_query(mock_load, authenticated_client, mock_db):
 
 
 @patch("inventory_app.app.load_config")
-def test_item_form_datalist_suggestions(mock_load, authenticated_client, mock_db):
+@patch("inventory_app.app.get_item_suggestions")  # <--- NEW PATCH
+def test_item_form_datalist_suggestions(mock_get_suggestions, mock_load, authenticated_client, mock_db):
     """
     Verifies that 'New Item' page fetches distinct values for
     Category, Manufacturer, and Model to populate datalists.
     """
     mock_load.return_value = {"configured": True}
-    mock_cur = mock_db.cursor.return_value
-    # We expect 3 distinct queries for suggestions (Category, Manufacturer, Model)
-    # Returning a list of tuples for fetchall()
-    mock_cur.fetchall.side_effect = [
-        [("Audio",), ("Video",)],     # Categories
-        [("Sony",), ("Shure",)],     # Manufacturers
-        [("SM58",), ("A7S",)]        # Models
-    ]
+
+    # Mock the return value of the newly extracted function
+    mock_get_suggestions.return_value = {
+        "category": ["Audio", "Video"],
+        "manufacturer": ["Sony", "Shure"],
+        "model": ["SM58", "A7S"]
+    }
+
     response = authenticated_client.get("/items/new")
     assert response.status_code == 200
+
     # Check for datalist structure
     assert b'id="category_list"' in response.data
     assert b'id="manufacturer_list"' in response.data
     assert b'id="model_list"' in response.data
+
     # Check for specific suggestion values
     assert b'value="Audio"' in response.data
     assert b'value="Sony"' in response.data
     assert b'value="SM58"' in response.data
-    # Verify the logic called the database for distinct values
-    executed_queries = [call[0][0].lower() for call in mock_cur.execute.call_args_list]
-    assert any("select distinct category" in q for q in executed_queries)
-    assert any("select distinct manufacturer" in q for q in executed_queries)
-    assert any("select distinct model" in q for q in executed_queries)
 
 
 @patch("inventory_app.app.load_config")
-def test_edit_item_includes_suggestions(mock_load, authenticated_client, mock_db):
+@patch("inventory_app.app.get_item_suggestions")  # <--- NEW PATCH
+def test_edit_item_includes_suggestions(mock_get_suggestions, mock_load, authenticated_client, mock_db):
     """
     Verifies that the 'Edit Item' page also provides autocomplete suggestions.
     """
     mock_load.return_value = {"configured": True}
     mock_cur = mock_db.cursor.return_value
+
     # 1. First fetchone() for the item itself
     mock_cur.fetchone.return_value = ("ACC-01", "Cam", "Video", "Desc", "SN1", "Sony", "A7")
-    # 2. Subsequent fetchall() calls for the three suggestion lists
-    mock_cur.fetchall.side_effect = [
-        [("Audio",), ("Video",)],
-        [("Sony",)],
-        [("A7",)]
-    ]
+
+    # 2. Mock the return value of the newly extracted function
+    mock_get_suggestions.return_value = {
+        "category": ["Audio", "Video"],
+        "manufacturer": ["Sony"],
+        "model": ["A7"]
+    }
+
     response = authenticated_client.get("/items/ACC-01/edit")
     assert response.status_code == 200
+
     # Verify the current item data is there
     assert b"ACC-01" in response.data
+
     # Verify the suggestions are also present in the HTML
     assert b'id="category_list"' in response.data
     assert b'value="Video"' in response.data
 
 
 @patch("inventory_app.app.load_config")
-def test_inventory_pdf_report(mock_load, authenticated_client, mock_db):
+@patch("inventory_app.reports.get_db")  # <--- NEW PATCH
+def test_inventory_pdf_report(mock_reports_db, mock_load, authenticated_client, mock_db):
     """Tests GET /reports/items.pdf."""
     mock_load.return_value = {"configured": True}
+    mock_reports_db.return_value = mock_db
     mock_cur = mock_db.cursor.return_value
     mock_cur.fetchall.return_value = [
         ("ID1", "Item A", "Cat1", "SN-A", "MakeA", "ModA")
@@ -173,9 +179,11 @@ def test_inventory_pdf_report(mock_load, authenticated_client, mock_db):
 
 
 @patch("inventory_app.app.load_config")
-def test_production_pdf_report_with_notes(mock_load, authenticated_client, mock_db):
+@patch("inventory_app.reports.get_db")
+def test_production_pdf_report_with_notes(mock_reports_db, mock_load, authenticated_client, mock_db):
     """Tests the BOM PDF generation including the text wrap logic for long notes."""
     mock_load.return_value = {"configured": True}
+    mock_reports_db.return_value = mock_db
     mock_cur = mock_db.cursor.return_value
 
     # Mock production header (id, name, date, notes)
