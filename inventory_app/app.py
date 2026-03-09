@@ -79,7 +79,8 @@ class User(UserMixin):
 
 def find_user_by_username(username):
     conn = get_db()
-    if not conn: return None
+    if not conn:
+        return None
     cur = conn.cursor()
     cur.execute(
         "SELECT id, username, password_hash, is_admin FROM users WHERE username=%s",
@@ -95,7 +96,8 @@ def find_user_by_username(username):
 
 def find_user_by_id(user_id):
     conn = get_db()
-    if not conn: return None
+    if not conn:
+        return None
     cur = conn.cursor()
     cur.execute(
         "SELECT id, username, password_hash, is_admin FROM users WHERE id=%s",
