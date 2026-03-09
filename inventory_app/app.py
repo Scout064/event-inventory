@@ -1,14 +1,12 @@
 import os
-import json
 import re
 import io
-import mariadb
-import qrcode
 import csv
 import psutil
 from functools import wraps
 from datetime import datetime
-from PIL import Image, ImageDraw, ImageFont
+
+import mariadb
 from flask import (
     Flask, render_template, request, redirect, url_for, flash,
     send_file, abort, send_from_directory, jsonify
@@ -17,85 +15,30 @@ from flask_login import (
     LoginManager, login_user, logout_user,
     current_user, login_required, UserMixin
 )
-from flask_wtf import FlaskForm
-from wtforms import (
-    StringField, PasswordField, SubmitField, BooleanField,
-    TextAreaField, FileField, DateField
-)
-from wtforms.validators import (
-    DataRequired, Length, Optional, Email,
-    EqualTo, Regexp
-)
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-from reportlab.lib.units import mm
-from reportlab.lib.utils import simpleSplit
-from inventory_app.security import ReservedUsername
+
+# Import from our new modules
+from inventory_app.db import (
+    load_config, save_config, get_db, init_db, get_item_suggestions,
+    APP_DIR
+)
+from inventory_app.forms import (
+    SetupForm, LoginForm, ItemForm, ProductionForm,
+    UserAdminForm, UserProfileForm
+)
+from inventory_app.reports import (
+    create_label_image, create_items_pdf, create_production_pdf
+)
 from inventory_app.version import (
-    get_current_version, get_beta_releases,
-    get_stable_releases
+    get_current_version, get_beta_releases, get_stable_releases
 )
 
 
-APP_DIR = os.path.dirname(os.path.abspath(__file__))
-CONFIG_PATH = os.path.join(APP_DIR, "config.json")
 UPLOAD_DIR = os.path.join(APP_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 QR_DIR = os.path.join(APP_DIR, "static", "qr_codes")
 os.makedirs(QR_DIR, exist_ok=True)
-
-
-def load_config():
-    if not os.path.exists(CONFIG_PATH):
-        return {"configured": False}
-    with open(CONFIG_PATH, "r") as f:
-        return json.load(f)
-
-
-def save_config(cfg):
-    with open(CONFIG_PATH, "w") as f:
-        json.dump(cfg, f, indent=2)
-
-
-def get_db():
-    cfg = load_config()
-    if not cfg.get("configured"):
-        return None
-    conn = mariadb.connect(
-        user=cfg["db_user"],
-        password=cfg["db_pass"],
-        host=cfg["db_host"],
-        port=int(cfg.get("db_port", 3306)),
-        database=cfg["db_name"],
-    )
-    return conn
-
-
-def init_db():
-    conn = get_db()
-    if not conn:
-        return
-    cur = conn.cursor()
-    schema_path = os.path.join(APP_DIR, "schema.sql")
-    if os.path.exists(schema_path):
-        with open(schema_path, "r") as f:
-            # Split by semicolon to get individual commands
-            sql_commands = f.read().split(';')
-        for command in sql_commands:
-            if command.strip():
-                try:
-                    cur.execute(command)
-                except mariadb.Error as e:
-                    print(f"Error executing command: {e}")
-        conn.commit()
-        print("Database initialized from schema.sql")
-    else:
-        print("schema.sql not found. Skipping initialization.")
-    cur.close()
-    conn.close()
-
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-change-me")
@@ -118,7 +61,9 @@ def enforce_https():
     is_secure = request.is_secure or forwarded_proto == "https"
     remote_ip = request.remote_addr or ""
     if not is_secure and not LAN_REGEX.match(remote_ip):
-        domain = cfg.get("app_domain", request.host)
+        domain = cfg.get("app_domain")
+        if not domain:
+            abort(400, description="HTTPS enforcement failed: No trusted app_domain configured.")
         path = request.full_path
         secure_url = f"https://{domain}{path}"
         return redirect(secure_url, code=301)
@@ -134,6 +79,8 @@ class User(UserMixin):
 
 def find_user_by_username(username):
     conn = get_db()
+    if not conn:
+        return None
     cur = conn.cursor()
     cur.execute(
         "SELECT id, username, password_hash, is_admin FROM users WHERE username=%s",
@@ -149,6 +96,8 @@ def find_user_by_username(username):
 
 def find_user_by_id(user_id):
     conn = get_db()
+    if not conn:
+        return None
     cur = conn.cursor()
     cur.execute(
         "SELECT id, username, password_hash, is_admin FROM users WHERE id=%s",
@@ -168,134 +117,6 @@ def load_user(user_id):
     if not cfg.get("configured"):
         return None
     return find_user_by_id(user_id)
-
-
-class SetupForm(FlaskForm):
-    app_domain = StringField(
-        "App Domain (e.g., inventory.example.com)",
-        validators=[DataRequired()],
-        default="localhost:8000"
-    )
-    db_host = StringField("DB Host", validators=[DataRequired()], default="localhost")
-    db_port = StringField("DB Port", validators=[DataRequired()], default="3306")
-    db_name = StringField(
-        "DB Name", validators=[DataRequired()], default="inventory_db"
-    )
-    db_user = StringField("DB User", validators=[DataRequired()], default="inventory_user")
-    db_pass = PasswordField("DB Password", validators=[DataRequired()])
-    admin_username = StringField(
-        "Admin Username", validators=[DataRequired(), Length(min=3, max=128)], default="admin"
-    )
-    admin_password = PasswordField(
-        "Admin Password", validators=[DataRequired(), Length(min=6)]
-    )
-    default_user_username = StringField(
-        "Default User Username", validators=[Optional(), Length(min=3, max=128)]
-    )
-    default_user_password = PasswordField(
-        "Default User Password", validators=[Optional(), Length(min=6)]
-    )
-    company_logo = FileField("Company Logo (PNG/JPEG)")
-    submit = SubmitField("Initialize")
-
-
-class LoginForm(FlaskForm):
-    username = StringField("Username", validators=[DataRequired()])
-    password = PasswordField("Password", validators=[DataRequired()])
-    remember = BooleanField("Remember Me")
-    submit = SubmitField("Login")
-
-
-class ItemForm(FlaskForm):
-    inventory_id = StringField(
-        "Inventory ID",
-        validators=[
-            DataRequired(message="ID is required and cannot be blank"),
-            Length(min=1, max=32)
-        ]
-    )
-    name = StringField(
-        "Name",
-        validators=[
-            DataRequired(message="Name is required and cannot be blank"),
-            Length(min=1, max=120)
-        ]
-    )
-    category = StringField("Category", validators=[Optional(), Length(max=50)])
-    description = TextAreaField("Description", validators=[Optional(), Length(max=250)])
-    serial_number = StringField("Serial Number", validators=[Optional(), Length(max=50)])
-    manufacturer = StringField("Manufacturer", validators=[Optional(), Length(max=50)])
-    model = StringField("Model", validators=[Optional(), Length(max=50)])
-    submit = SubmitField("Save")
-
-
-class ProductionForm(FlaskForm):
-    name = StringField(
-        "Name",
-        validators=[
-            DataRequired(message="Production name is required"),
-            Length(min=1, max=32, message="Name must be between 1 and 32 characters")
-        ]
-    )
-    date = StringField("Date (YYYY-MM-DD)", validators=[Optional()])
-    notes = TextAreaField("Notes", validators=[Optional(), Length(max=255, message="Notes cannot exceed 255 characters")])
-    submit = SubmitField("Save")
-
-
-class UserAdminForm(FlaskForm):
-    username = StringField(
-        "Username",
-        validators=[
-            DataRequired(),
-            Length(min=3, max=32, message="Username must be between 3 and 32 characters."),
-            # Allows letters, numbers, specific language characters, dots, hyphens, and underscores
-            Regexp(r'^[a-zA-Z0-9äöüÄÖÜßéèêáàâíìîóòôúùûñÑçÇ._\-]+$', message="Username contains invalid special characters.")
-        ]
-    )
-    password = PasswordField("Password (leave blank to keep current)", validators=[Optional(), Length(min=6)])
-    confirm_password = PasswordField("Confirm Password", validators=[EqualTo('password', message='Passwords must match')])
-    is_admin = BooleanField("Grant Admin Privileges")
-    submit = SubmitField("Save User")
-
-
-class UserProfileForm(FlaskForm):
-    username = StringField(
-        "Username",
-        validators=[
-            DataRequired(),
-            Length(min=3, max=32, message="Username must be between 3 and 32 characters."),
-            Regexp(
-                r'^[a-zA-Z0-9äöüÄÖÜßéèêáàâíìîóòôúùûñÑçÇ._\-]+$',
-                message="Username contains invalid special characters."
-            ),
-            ReservedUsername()
-        ]
-    )
-    real_name = StringField(
-        "Real Name",
-        validators=[
-            Optional(),
-            Length(max=32, message="Real name cannot exceed 32 characters."),
-            # Same as above but allows spaces
-            Regexp(
-                r'^[a-zA-Z0-9äöüÄÖÜßéèêáàâíìîóòôúùûñÑçÇ\s.\-]+$',
-                message="Real name contains invalid special characters."
-            )
-        ]
-    )
-    email = StringField(
-        "E-Mail Address",
-        validators=[
-            Optional(),
-            Email(),
-            Length(max=32, message="Email cannot exceed 32 characters.")
-        ]
-    )
-    birthday = DateField("Birthday", format='%Y-%m-%d', validators=[Optional()])
-    current_password = PasswordField("Current Password", validators=[Optional()])
-    password = PasswordField("New Password (leave blank to keep current)", validators=[Optional(), Length(min=6)])
-    confirm_password = PasswordField("Confirm New Password", validators=[EqualTo('password', message='Passwords must match')])
-    submit = SubmitField("Save Profile")
 
 
 def admin_required(f):
@@ -346,7 +167,6 @@ def create_users(cur, admin_data, default_data=None):
 def inject_site_branding():
     cfg = load_config()
     site_cfg = {"site_name": cfg.get("site_name", "Inventory"), "logo_path": cfg.get("logo_path")}
-    # 3. Read persistent branding from database
     conn = get_db()
     if conn:
         try:
@@ -356,7 +176,7 @@ def inject_site_branding():
                 site_cfg[row[0]] = row[1]
             cur.close()
         except Exception:
-            pass  # Fails gracefully if DB isn't initialized yet
+            pass
         finally:
             conn.close()
     return dict(site_cfg=site_cfg)
@@ -455,14 +275,12 @@ def index():
 @app.route('/items')
 @login_required
 def items():
-    # 1. Get parameters from the URL
     page = request.args.get('page', 1, type=int)
     q = request.args.get('q', '').strip()
     per_page = 100
     offset = (page - 1) * per_page
     conn = get_db()
     cur = conn.cursor()
-    # 2. Build the search condition
     search_wildcard = f"%{q}%"
     where_clause = ""
     params = []
@@ -477,12 +295,9 @@ def items():
                OR description LIKE %s
         """
         params = [search_wildcard] * 7
-    # 3. Get total count for this search (for pagination)
     cur.execute(f"SELECT COUNT(*) FROM items {where_clause}", tuple(params))
     total_items = cur.fetchone()[0]
     total_pages = (total_items + per_page - 1) // per_page
-    # 4. Fetch the specific page of data
-    # We order by inventory_id to ensure a stable sequence across pages
     query = f"""
         SELECT inventory_id, name, category, serial_number, manufacturer, model
         FROM items
@@ -502,20 +317,6 @@ def items():
         total_items=total_items,
         q=q
     )
-
-
-def get_item_suggestions():
-    """Helper to fetch distinct values for autocomplete suggestions."""
-    conn = get_db()
-    cur = conn.cursor()
-    suggestions = {}
-    for field in ['category', 'manufacturer', 'model']:
-        # Fetch non-empty distinct values
-        cur.execute(f"SELECT DISTINCT {field} FROM items WHERE {field} IS NOT NULL AND {field} != '' ORDER BY {field}")
-        suggestions[field] = [row[0] for row in cur.fetchall()]
-    cur.close()
-    conn.close()
-    return suggestions
 
 
 @app.route("/items/new", methods=["GET", "POST"])
@@ -542,7 +343,6 @@ def items_new():
         finally:
             cur.close()
             conn.close()
-    # Fetch suggestions for the datalists on GET or failed validation
     suggestions = get_item_suggestions()
     return render_template("item_form.html", form=form, mode="new", suggestions=suggestions)
 
@@ -559,7 +359,6 @@ def items_edit(inventory_id):
         cur.close()
         conn.close()
         abort(404)
-    # Pre-fill form with existing data
     form = ItemForm(data={
         "inventory_id": row[0],
         "name": row[1],
@@ -586,7 +385,6 @@ def items_edit(inventory_id):
         except mariadb.Error as ex:
             conn.rollback()
             flash(f"Error: {ex}", "danger")
-    # Fetch suggestions for the datalists
     suggestions = get_item_suggestions()
     cur.close()
     conn.close()
@@ -614,15 +412,12 @@ def items_delete(inventory_id):
 @app.route("/items/template")
 @login_required
 def items_download_template():
-    """Generates and serves a blank CSV template for bulk import."""
     bio = io.StringIO()
     writer = csv.writer(bio)
-    # Headers based on ItemForm and DB schema
     writer.writerow([
         "inventory_id", "name", "category", "description",
         "serial_number", "manufacturer", "model"
     ])
-    # Add an example row for the user
     writer.writerow([
         "MIC-001", "SM58", "Audio", "Dynamic vocal microphone",
         "SN123456", "Shure", "SM58-LC"
@@ -639,18 +434,11 @@ def items_download_template():
 
 
 def process_item_row(cur, row):
-    """
-    Helper to process a single CSV row.
-    Returns: 0 (Skip Empty), 1 (Success), 2 (Duplicate), 3 (Error)
-    """
-    # Clean the row to handle None values and strip whitespace safely
     cleaned = {k: (v.strip() if v else '') for k, v in row.items() if k}
-    # If the row is completely empty (e.g., trailing commas), silently skip it
     if not any(cleaned.values()):
         return 0
     inv_id = cleaned.get('inventory_id', '')
     name = cleaned.get('name', '')
-    # Enforce mandatory fields: ID and Name cannot be blank
     if not inv_id or not name:
         return 3
     try:
@@ -667,20 +455,19 @@ def process_item_row(cur, row):
             cleaned.get('manufacturer') or None,
             cleaned.get('model') or None
         ))
-        return 1  # Success
+        return 1
     except mariadb.IntegrityError as ie:
         if ie.errno == 1062:
-            return 2  # Duplicate
-        return 3      # Other DB Error
+            return 2
+        return 3
     except Exception as e:
         print(f"Row Exception: {e}")
-        return 3      # General Error
+        return 3
 
 
 @app.route("/items/import", methods=["GET", "POST"])
 @login_required
 def items_import():
-    """Handles the uploading and processing of the bulk import CSV."""
     if request.method == "POST":
         file = request.files.get("csv_file")
         if not file or not file.filename.endswith('.csv'):
@@ -690,10 +477,10 @@ def items_import():
         reader = csv.DictReader(stream)
         conn = get_db()
         cur = conn.cursor()
-        counts = {1: 0, 2: 0, 3: 0}  # 1: Success, 2: Duplicate, 3: Error
+        counts = {1: 0, 2: 0, 3: 0}
         for row in reader:
             result = process_item_row(cur, row)
-            if result in counts:  # Result 0 (Skip) is ignored and not counted
+            if result in counts:
                 counts[result] += 1
         conn.commit()
         cur.close()
@@ -709,15 +496,12 @@ def items_import():
 @app.route("/items/search")
 @login_required
 def api_items_search():
-    """Server-side search for the TomSelect dropdown."""
     q = request.args.get("q", "").strip()
-    # If the search query is empty, return an empty list
     if not q:
         return jsonify({"items": []})
     conn = get_db()
     cur = conn.cursor()
     try:
-        # Search by ID or Name, limit to 50 so the frontend stays snappy
         query = """
             SELECT inventory_id, name
             FROM items
@@ -727,7 +511,6 @@ def api_items_search():
         search_term = f"%{q}%"
         cur.execute(query, (search_term, search_term))
         results = cur.fetchall()
-        # Format the results as a list of dictionaries for JSON serialization
         items = [{"id": r[0], "name": r[1]} for r in results]
         return jsonify({"items": items})
     except mariadb.Error as e:
@@ -747,7 +530,6 @@ def productions():
     cur = conn.cursor()
     if q:
         search_term = f"%{q}%"
-        # Search across ID, Name, and Notes
         cur.execute("""
             SELECT id, name, date, notes
             FROM productions
@@ -755,12 +537,10 @@ def productions():
             ORDER BY date DESC
         """, (search_term, search_term, search_term))
     else:
-        # Default load: sort by date descending
         cur.execute("SELECT id, name, date, notes FROM productions ORDER BY date DESC")
     rows = cur.fetchall()
     cur.close()
     conn.close()
-    # Pass the 'q' parameter back to the template so the search bar keeps its value
     return render_template("productions.html", rows=rows, q=q)
 
 
@@ -866,7 +646,6 @@ def productions_view(pid):
                    WHERE pi.production_id=%s
                    ORDER BY i.name""", (pid,))
     items = cur.fetchall()
-    # All items for assignment
     cur.execute("SELECT inventory_id,name FROM items ORDER BY name")
     all_items = cur.fetchall()
     cur.close()
@@ -919,7 +698,6 @@ def productions_remove(pid):
 @app.route("/productions/<int:pid>/clear", methods=["POST"])
 @login_required
 def productions_clear_all(pid):
-    """Removes every item assigned to a specific production."""
     conn = get_db()
     cur = conn.cursor()
     try:
@@ -938,7 +716,6 @@ def productions_clear_all(pid):
 @app.route("/productions/<int:pid>/batch_remove", methods=["POST"])
 @login_required
 def productions_batch_remove(pid):
-    """Removes a list of selected items from the production."""
     item_ids = request.form.getlist("item_ids")
     if not item_ids:
         flash("No items were selected for removal.", "warning")
@@ -946,7 +723,6 @@ def productions_batch_remove(pid):
     conn = get_db()
     cur = conn.cursor()
     try:
-        # Construct a query like: DELETE ... WHERE pid = %s AND inventory_id IN (%s, %s, %s)
         format_strings = ','.join(['%s'] * len(item_ids))
         query = f"DELETE FROM production_items WHERE production_id = %s AND inventory_id IN ({format_strings})"
         cur.execute(query, [pid] + item_ids)
@@ -961,34 +737,9 @@ def productions_batch_remove(pid):
     return redirect(url_for("productions_view", pid=pid))
 
 
-# QR label with logo in center
-def generate_qr_with_logo(data_text, logo_path=None, box_size=10, border=4):
-    qr = qrcode.QRCode(
-        error_correction=qrcode.constants.ERROR_CORRECT_H,
-        box_size=box_size,
-        border=border
-    )
-    qr.add_data(data_text)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
-
-    if logo_path and os.path.exists(logo_path):
-        logo = Image.open(logo_path).convert("RGBA")
-        # Scale logo to ~22% of QR size
-        qr_w, qr_h = img.size
-        logo_size = int(min(qr_w, qr_h) * 0.22)
-        logo.thumbnail((logo_size, logo_size), Image.LANCZOS)
-        lx = (qr_w - logo.size[0]) // 2
-        ly = (qr_h - logo.size[1]) // 2
-        img.paste(logo, (lx, ly), logo)
-
-    return img
-
-
 @app.route("/labels/<inventory_id>.png")
 @login_required
 def label_png(inventory_id):
-    cfg = load_config()
     conn = get_db()
     cur = conn.cursor()
     cur.execute("""
@@ -999,175 +750,31 @@ def label_png(inventory_id):
     row = cur.fetchone()
     cur.close()
     conn.close()
+
     if not row:
         abort(404)
-    # Unpack values and replace None with empty strings
+
     inventory_id_val, name, category, serial, manufacturer, model = (str(v or '') for v in row)
-    # Generate QR
-    qr = generate_qr_with_logo(inventory_id_val, cfg.get("logo_path"))
-    # Create label image (100mm x 54mm at 300dpi)
-    dpi = 300
-    width_px = int((100 / 25.4) * dpi)
-    height_px = int((54 / 25.4) * dpi)
-    label = Image.new("RGB", (width_px, height_px), "white")
-    # Paste QR on the left
-    qr_size = int(height_px * 0.9)
-    qr = qr.resize((qr_size, qr_size), Image.LANCZOS)
-    label.paste(qr, (int(height_px * 0.05), int(height_px * 0.05)))
-    draw = ImageDraw.Draw(label)
-    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-    # Prepare text lines
-    lines = []
-    if inventory_id_val:
-        lines.append(inventory_id_val)
-    if name or category:
-        lines.append(f"{name} ({category})" if category else name)
-    if serial:
-        lines.append(f"SN: {serial}")
-    if manufacturer or model:
-        lines.append(f"{manufacturer} {model}".strip())
-    # Text area
-    x = qr_size + int(height_px * 0.1)
-    y_start = int(height_px * 0.12)
-    max_text_width = width_px - x - int(height_px * 0.05)
-    max_text_height = height_px - y_start - int(height_px * 0.05)
-    # Initial sizes
-    base_font_size = int(height_px * 0.08)
-    min_font_size = 10
-    # Function to compute block height for given font size
 
-    def compute_block_height(f_size):
-        return len(lines) * f_size + (len(lines) - 1) * int(f_size * 0.5)
-    # Scale font size down if block is too tall
-    font_size = base_font_size
-    while compute_block_height(font_size) > max_text_height and font_size > min_font_size:
-        font_size -= 1
-    # Now draw each line, adjusting horizontally too
-    y = y_start
-    for idx, text in enumerate(lines):
-        size = font_size
-        font = ImageFont.truetype(font_path, size)
-        # Shrink font horizontally if too wide
-        while draw.textlength(text, font=font) > max_text_width and size > min_font_size:
-            size -= 1
-            font = ImageFont.truetype(font_path, size)
-        draw.text((x, y), text, font=font, fill="black")
-        y += size + int(size * 0.5)
-
-    # Output PNG
-    bio = io.BytesIO()
-    label.save(bio, format="PNG")
-    bio.seek(0)
+    # Delegate to reports.py
+    bio = create_label_image(inventory_id_val, name, category, serial, manufacturer, model)
     return send_file(bio, mimetype="image/png", as_attachment=False, download_name=f"{inventory_id_val}.png")
 
 
-# PDF reports
 @app.route("/reports/items.pdf")
 @login_required
 def report_items_pdf():
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("""SELECT inventory_id, name, category, serial_number, manufacturer, model
-                   FROM items ORDER BY name""")
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
-
-    bio = io.BytesIO()
-    c = canvas.Canvas(bio, pagesize=A4, pageCompression=1)
-    width, height = A4
-    y = height - 20 * mm
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(20 * mm, y, "Item Inventory Report")
-    y -= 10 * mm
-    c.setFont("Helvetica", 10)
-    for r in rows:
-        line = f"{r[0]} | {r[1]} | {r[2] or ''} | SN:{r[3] or ''} | {r[4] or ''} {r[5] or ''}"
-        if y < 20 * mm:
-            c.showPage()
-            y = height - 20 * mm
-            c.setFont("Helvetica", 10)
-        c.drawString(15 * mm, y, line[:120])
-        y -= 6 * mm
-    c.showPage()
-    c.save()
-    bio.seek(0)
+    bio = create_items_pdf()
     return send_file(bio, mimetype="application/pdf", as_attachment=True, download_name="items_report.pdf")
 
 
 @app.route("/reports/production/<int:pid>.pdf")
 @login_required
 def report_production_pdf(pid):
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT id, name, date, notes FROM productions WHERE id=%s", (pid,))
-    prod = cur.fetchone()
-    if not prod:
-        cur.close()
-        conn.close()
+    result = create_production_pdf(pid)
+    if not result:
         abort(404)
-    cur.execute("""SELECT i.inventory_id, i.name, i.category, i.serial_number, i.manufacturer, i.model
-                   FROM production_items pi
-                   JOIN items i ON i.inventory_id = pi.inventory_id
-                   WHERE pi.production_id=%s
-                   ORDER BY i.name""", (pid,))
-    items = cur.fetchall()
-    cur.close()
-    conn.close()
-    bio = io.BytesIO()
-    c = canvas.Canvas(bio, pagesize=A4, pageCompression=1)
-    width, height = A4
-    # Define margins and usable width
-    margin_left = 20 * mm
-    max_width = width - (margin_left * 2)
-    y = height - 20 * mm
-    # Header
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(margin_left, y, f"BOM – {prod[1]}")
-    y -= 8 * mm
-    c.setFont("Helvetica", 10)
-    c.drawString(margin_left, y, f"Date: {prod[2] or 'TBD'}")
-    y -= 8 * mm
-    # --- Dynamic Notes Section ---
-    if prod[3]:
-        c.setFont("Helvetica-Bold", 10)
-        c.drawString(margin_left, y, "Notes:")
-        c.setFont("Helvetica", 10)
-        # Wrap the notes text to fit within max_width
-        note_lines = simpleSplit(prod[3], "Helvetica", 10, max_width)
-        for line in note_lines:
-            y -= 5 * mm
-            # Check for page end
-            if y < 20 * mm:
-                c.showPage()
-                y = height - 20 * mm
-            c.drawString(margin_left, y, line)
-        y -= 10 * mm  # Extra space after notes section
-    # --- Items List ---
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(margin_left, y, "Inventory ID | Item Name | Category | Details")
-    y -= 2 * mm
-    c.line(margin_left, y, width - margin_left, y)
-    y -= 6 * mm
-    for r in items:
-        # Construct text: ID | Name | Cat | SN | Manufacturer Model
-        details = f"SN:{r[3] or 'N/A'} | {r[4] or ''} {r[5] or ''}"
-        item_text = f"{r[0]} | {r[1]} | {r[2] or ''} | {details}"
-        wrapped_item = simpleSplit(item_text, "Helvetica", 10, max_width)
-        for i, line in enumerate(wrapped_item):
-            # Page overflow check
-            if y < 20 * mm:
-                c.showPage()
-                y = height - 20 * mm
-                c.setFont("Helvetica", 10)
-            # Indent subsequent lines of the same item for better readability
-            current_x = margin_left if i == 0 else margin_left + 4 * mm
-            c.drawString(current_x, y, line)
-            y -= 5 * mm
-        y -= 3 * mm  # Space between different items
-    c.showPage()
-    c.save()
-    bio.seek(0)
+    bio, prod_name = result
     return send_file(bio, mimetype="application/pdf", as_attachment=True, download_name=f"production_{pid}_BOM.pdf")
 
 
@@ -1186,23 +793,23 @@ def search():
         return redirect(url_for("index"))
 
     cur = conn.cursor()
-    # 1. Search Items (Matched with your schema)
     cur.execute("""
         SELECT inventory_id, name, category, manufacturer
         FROM items
         WHERE name LIKE %s OR inventory_id LIKE %s OR serial_number LIKE %s OR model LIKE %s
     """, (search_term, search_term, search_term, search_term))
     items_list = cur.fetchall()
-    # 2. Search Productions
+
     cur.execute("""
         SELECT id, name, date
         FROM productions
         WHERE name LIKE %s OR notes LIKE %s
     """, (search_term, search_term))
     productions_list = cur.fetchall()
-    # 3. Search Users
+
     cur.execute("SELECT id, username, is_admin FROM users WHERE username LIKE %s", (search_term,))
     users_list = cur.fetchall()
+
     cur.close()
     conn.close()
     return render_template(
@@ -1214,9 +821,7 @@ def search():
     )
 
 
-# Profile Helper function due to complexity
 def _execute_profile_update(cur, user_id, uname, rname, email, bday, pw_hash=None):
-    """Helper to handle the SQL update logic for the profile."""
     if pw_hash:
         query = """UPDATE users
                    SET username=%s, real_name=%s, email=%s, birthday=%s, password_hash=%s
@@ -1230,7 +835,6 @@ def _execute_profile_update(cur, user_id, uname, rname, email, bday, pw_hash=Non
     cur.execute(query, params)
 
 
-# User Profile Route
 @app.route("/profile", methods=["GET", "POST"])
 @login_required
 def profile():
@@ -1243,14 +847,11 @@ def profile():
         conn.close()
         abort(404)
     form = UserProfileForm()
-    # Handle GET request: Populate form
     if request.method == "GET":
         form.username.data, form.real_name.data, form.email.data, form.birthday.data = row[0], row[1], row[2], row[3]
-    # Handle POST request: Process update
     if form.validate_on_submit():
         pw = form.password.data
         current_pw = form.current_password.data
-        # Security Check: Validate current password if changing to a new one
         if pw:
             if not current_pw or not check_password_hash(row[4], current_pw):
                 flash("Current Password is required and must be correct to set a new password.", "danger")
@@ -1281,7 +882,7 @@ def profile():
 @login_required
 def about():
     version_path = os.path.join(APP_DIR, "version.json")
-    version_string = "v0.0.0 (Unknown)"  # Default if file is missing
+    version_string = "v0.0.0 (Unknown)"
     stable_releases = []
     beta_releases = []
     stats = None
@@ -1292,22 +893,20 @@ def about():
             beta_releases = get_beta_releases(limit=5)
         except Exception as e:
             print(f"Error reading version.json: {e}")
-    # --- NEW: Fetch Server Stats if Admin ---
+
     if getattr(current_user, "is_admin", False):
         stats = {
             "cpu_percent": psutil.cpu_percent(interval=0.1),
             "ram_percent": psutil.virtual_memory().percent,
-            "ram_total": round(psutil.virtual_memory().total / (1024 ** 3), 2),  # in GB
+            "ram_total": round(psutil.virtual_memory().total / (1024 ** 3), 2),
             "disk_percent": psutil.disk_usage('/').percent,
-            "disk_total": round(psutil.disk_usage('/').total / (1024 ** 3), 2),  # in GB
+            "disk_total": round(psutil.disk_usage('/').total / (1024 ** 3), 2),
             "db_size": "Unknown"
         }
-        # Calculate Database Size
         conn = get_db()
         if conn:
             try:
                 cur = conn.cursor()
-                # Query MariaDB for the size of the specific database
                 cur.execute("""
                     SELECT SUM(data_length + index_length) / 1024 / 1024
                     FROM information_schema.tables
@@ -1326,11 +925,8 @@ def about():
         currentVersion=version_string,
         releases=stable_releases,
         beta=beta_releases,
-        stats=stats  # Pass stats to template
+        stats=stats
     )
-
-
-# Admin-only routes
 
 
 @app.route("/admin/settings", methods=["GET", "POST"])
@@ -1340,21 +936,17 @@ def admin_settings():
     conn = get_db()
     cur = conn.cursor()
     if request.method == "POST":
-        # BACKEND LIMIT 2: max 32 characters
         site_name = request.form.get("site_name", "Inventory").strip()
         if len(site_name) > 32:
             flash("Site name cannot exceed 32 characters.", "danger")
             return redirect(url_for("admin_settings"))
-        # Write to Database
         cur.execute("REPLACE INTO settings (setting_key, setting_value) VALUES ('site_name', %s)", (site_name,))
-        # Logo Logic
         if request.form.get("remove_logo") == "yes":
             cur.execute("REPLACE INTO settings (setting_key, setting_value) VALUES ('logo_path', NULL)")
         else:
             file = request.files.get("company_logo")
             if file and file.filename:
                 try:
-                    # save_logo() acts as BACKEND LIMIT 1: It raises ValueError if not PNG/JPG
                     logo_path = save_logo(file)
                     cur.execute("REPLACE INTO settings (setting_key, setting_value) VALUES ('logo_path', %s)", (logo_path,))
                 except ValueError:
@@ -1363,7 +955,7 @@ def admin_settings():
         conn.commit()
         flash("Branding updated successfully.", "success")
         return redirect(url_for("admin_settings"))
-    # GET Request: Fetch settings to populate the form
+
     cur.execute("SELECT setting_key, setting_value FROM settings")
     rows = cur.fetchall()
     cfg = {r[0]: r[1] for r in rows}
@@ -1402,7 +994,6 @@ def admin_user_edit(user_id=None):
 
     form = UserAdminForm()
 
-    # Pre-fill if editing
     if request.method == "GET" and user_to_edit:
         form.username.data = user_to_edit[1]
         form.is_admin.data = bool(user_to_edit[2])
@@ -1444,7 +1035,6 @@ def admin_user_edit(user_id=None):
 @login_required
 @admin_required
 def admin_user_delete(user_id):
-    # Prevent the admin from deleting themselves
     if str(user_id) == str(current_user.id):
         flash("You cannot delete your own admin account.", "danger")
         return redirect(url_for("admin_users"))
@@ -1465,35 +1055,23 @@ def admin_user_delete(user_id):
     return redirect(url_for("admin_users"))
 
 
-# Optional static serving
 @app.route('/uploads/<path:filename>')
 def uploads(filename):
     return send_from_directory('uploads', filename)
 
 
-# --- Integrated Entry Point --- #
-
 def create_app():
-    """
-    Initializes the application logic.
-    This runs both in production (WSGI) and development (Manual).
-    """
     cfg = load_config()
     if not cfg.get("configured"):
-        # This prints to console or Apache error logs
         print("WARNING: App not configured. Visit /setup to initialize.")
     else:
-        # Run DB initialization/migrations if configured
         try:
             init_db()
         except Exception as e:
             print(f"ERROR: Could not initialize database: {e}")
     return app
-# WSGI entry point: Apache/mod_wsgi looks for an object named 'application'
 
 
 application = create_app()
 if __name__ == "__main__":
-    # This block ONLY runs if you type 'python app.py'
-    # Use application.run to ensure we use the instance returned by create_app()
     application.run(host="0.0.0.0", port=8000, debug=False)
