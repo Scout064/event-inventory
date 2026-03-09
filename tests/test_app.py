@@ -168,6 +168,7 @@ def test_edit_item_includes_suggestions(mock_get_suggestions, mock_load, authent
 def test_inventory_pdf_report(mock_load, authenticated_client, mock_db):
     """Tests GET /reports/items.pdf."""
     mock_load.return_value = {"configured": True}
+    mock_reports_db.return_value = mock_db
     mock_cur = mock_db.cursor.return_value
     mock_cur.fetchall.return_value = [
         ("ID1", "Item A", "Cat1", "SN-A", "MakeA", "ModA")
@@ -178,9 +179,11 @@ def test_inventory_pdf_report(mock_load, authenticated_client, mock_db):
 
 
 @patch("inventory_app.app.load_config")
+@patch("inventory_app.reports.get_db")
 def test_production_pdf_report_with_notes(mock_load, authenticated_client, mock_db):
     """Tests the BOM PDF generation including the text wrap logic for long notes."""
     mock_load.return_value = {"configured": True}
+    mock_reports_db.return_value = mock_db
     mock_cur = mock_db.cursor.return_value
 
     # Mock production header (id, name, date, notes)
