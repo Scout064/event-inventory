@@ -118,7 +118,11 @@ def enforce_https():
     is_secure = request.is_secure or forwarded_proto == "https"
     remote_ip = request.remote_addr or ""
     if not is_secure and not LAN_REGEX.match(remote_ip):
-        domain = cfg.get("app_domain", request.host)
+        # 1. Fetch the trusted domain from the configuration
+        domain = cfg.get("app_domain")
+        # 2. If no domain is configured, abort the redirect to prevent hijacking
+        if not domain:
+            abort(400, description="HTTPS enforcement failed: No trusted app_domain configured.")
         path = request.full_path
         secure_url = f"https://{domain}{path}"
         return redirect(secure_url, code=301)
