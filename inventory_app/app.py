@@ -20,11 +20,11 @@ from werkzeug.utils import secure_filename
 
 # Import from our new modules
 from inventory_app.db import (
-    load_config, save_config, get_db, init_db, get_item_suggestions, 
-    APP_DIR, CONFIG_PATH
+    load_config, save_config, get_db, init_db, get_item_suggestions,
+    APP_DIR
 )
 from inventory_app.forms import (
-    SetupForm, LoginForm, ItemForm, ProductionForm, 
+    SetupForm, LoginForm, ItemForm, ProductionForm,
     UserAdminForm, UserProfileForm
 )
 from inventory_app.reports import (
@@ -33,7 +33,7 @@ from inventory_app.reports import (
 from inventory_app.version import (
     get_current_version, get_beta_releases, get_stable_releases
 )
-from inventory_app.security import ReservedUsername
+
 
 UPLOAD_DIR = os.path.join(APP_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -50,6 +50,7 @@ LAN_REGEX = re.compile(
     r"^(127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|"
     r"172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+)$"
 )
+
 
 @app.before_request
 def enforce_https():
@@ -747,12 +748,12 @@ def label_png(inventory_id):
     row = cur.fetchone()
     cur.close()
     conn.close()
-    
+
     if not row:
         abort(404)
-        
+
     inventory_id_val, name, category, serial, manufacturer, model = (str(v or '') for v in row)
-    
+
     # Delegate to reports.py
     bio = create_label_image(inventory_id_val, name, category, serial, manufacturer, model)
     return send_file(bio, mimetype="image/png", as_attachment=False, download_name=f"{inventory_id_val}.png")
@@ -796,17 +797,17 @@ def search():
         WHERE name LIKE %s OR inventory_id LIKE %s OR serial_number LIKE %s OR model LIKE %s
     """, (search_term, search_term, search_term, search_term))
     items_list = cur.fetchall()
-    
+
     cur.execute("""
         SELECT id, name, date
         FROM productions
         WHERE name LIKE %s OR notes LIKE %s
     """, (search_term, search_term))
     productions_list = cur.fetchall()
-    
+
     cur.execute("SELECT id, username, is_admin FROM users WHERE username LIKE %s", (search_term,))
     users_list = cur.fetchall()
-    
+
     cur.close()
     conn.close()
     return render_template(
@@ -952,7 +953,7 @@ def admin_settings():
         conn.commit()
         flash("Branding updated successfully.", "success")
         return redirect(url_for("admin_settings"))
-    
+
     cur.execute("SELECT setting_key, setting_value FROM settings")
     rows = cur.fetchall()
     cfg = {r[0]: r[1] for r in rows}
