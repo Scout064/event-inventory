@@ -9,6 +9,7 @@ from wtforms.validators import (
 )
 from inventory_app.security import ReservedUsername
 
+
 class SetupForm(FlaskForm):
     app_domain = StringField(
         "App Domain (e.g., inventory.example.com)",
