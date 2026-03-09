@@ -1,14 +1,12 @@
 import os
-import json
 import re
 import io
-import mariadb
-import qrcode
 import csv
 import psutil
-from functools import wraps
 from datetime import datetime
-from PIL import Image, ImageDraw, ImageFont
+from functools import wraps
+
+import mariadb
 from flask import (
     Flask, render_template, request, redirect, url_for, flash,
     send_file, abort, send_from_directory, jsonify
@@ -17,85 +15,24 @@ from flask_login import (
     LoginManager, login_user, logout_user,
     current_user, login_required, UserMixin
 )
-from flask_wtf import FlaskForm
-from wtforms import (
-    StringField, PasswordField, SubmitField, BooleanField,
-    TextAreaField, FileField, DateField
-)
-from wtforms.validators import (
-    DataRequired, Length, Optional, Email,
-    EqualTo, Regexp
-)
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-from reportlab.lib.units import mm
-from reportlab.lib.utils import simpleSplit
+
+# Import from our new modules
+from inventory_app.db import load_config, save_config, get_db, init_db, get_item_suggestions, APP_DIR, CONFIG_PATH
+from inventory_app.reports import create_label_image, create_items_pdf, create_production_pdf
 from inventory_app.security import ReservedUsername
-from inventory_app.version import (
-    get_current_version, get_beta_releases,
-    get_stable_releases
+from inventory_app.version import get_current_version, get_beta_releases, get_stable_releases
+
+# Import Forms (Assuming you leave these here, or move them to forms.py)
+from inventory_app.forms import (
+    SetupForm, LoginForm, ItemForm, ProductionForm, UserAdminForm, UserProfileForm
 )
 
-
-APP_DIR = os.path.dirname(os.path.abspath(__file__))
-CONFIG_PATH = os.path.join(APP_DIR, "config.json")
 UPLOAD_DIR = os.path.join(APP_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 QR_DIR = os.path.join(APP_DIR, "static", "qr_codes")
 os.makedirs(QR_DIR, exist_ok=True)
-
-
-def load_config():
-    if not os.path.exists(CONFIG_PATH):
-        return {"configured": False}
-    with open(CONFIG_PATH, "r") as f:
-        return json.load(f)
-
-
-def save_config(cfg):
-    with open(CONFIG_PATH, "w") as f:
-        json.dump(cfg, f, indent=2)
-
-
-def get_db():
-    cfg = load_config()
-    if not cfg.get("configured"):
-        return None
-    conn = mariadb.connect(
-        user=cfg["db_user"],
-        password=cfg["db_pass"],
-        host=cfg["db_host"],
-        port=int(cfg.get("db_port", 3306)),
-        database=cfg["db_name"],
-    )
-    return conn
-
-
-def init_db():
-    conn = get_db()
-    if not conn:
-        return
-    cur = conn.cursor()
-    schema_path = os.path.join(APP_DIR, "schema.sql")
-    if os.path.exists(schema_path):
-        with open(schema_path, "r") as f:
-            # Split by semicolon to get individual commands
-            sql_commands = f.read().split(';')
-        for command in sql_commands:
-            if command.strip():
-                try:
-                    cur.execute(command)
-                except mariadb.Error as e:
-                    print(f"Error executing command: {e}")
-        conn.commit()
-        print("Database initialized from schema.sql")
-    else:
-        print("schema.sql not found. Skipping initialization.")
-    cur.close()
-    conn.close()
-
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-change-me")
@@ -992,186 +929,41 @@ def generate_qr_with_logo(data_text, logo_path=None, box_size=10, border=4):
 @app.route("/labels/<inventory_id>.png")
 @login_required
 def label_png(inventory_id):
-    cfg = load_config()
     conn = get_db()
     cur = conn.cursor()
     cur.execute("""
         SELECT inventory_id, name, category, serial_number, manufacturer, model
-        FROM items
-        WHERE inventory_id=%s
+        FROM items WHERE inventory_id=%s
     """, (inventory_id,))
     row = cur.fetchone()
     cur.close()
     conn.close()
+    
     if not row:
         abort(404)
-    # Unpack values and replace None with empty strings
+        
     inventory_id_val, name, category, serial, manufacturer, model = (str(v or '') for v in row)
-    # Generate QR
-    qr = generate_qr_with_logo(inventory_id_val, cfg.get("logo_path"))
-    # Create label image (100mm x 54mm at 300dpi)
-    dpi = 300
-    width_px = int((100 / 25.4) * dpi)
-    height_px = int((54 / 25.4) * dpi)
-    label = Image.new("RGB", (width_px, height_px), "white")
-    # Paste QR on the left
-    qr_size = int(height_px * 0.9)
-    qr = qr.resize((qr_size, qr_size), Image.LANCZOS)
-    label.paste(qr, (int(height_px * 0.05), int(height_px * 0.05)))
-    draw = ImageDraw.Draw(label)
-    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-    # Prepare text lines
-    lines = []
-    if inventory_id_val:
-        lines.append(inventory_id_val)
-    if name or category:
-        lines.append(f"{name} ({category})" if category else name)
-    if serial:
-        lines.append(f"SN: {serial}")
-    if manufacturer or model:
-        lines.append(f"{manufacturer} {model}".strip())
-    # Text area
-    x = qr_size + int(height_px * 0.1)
-    y_start = int(height_px * 0.12)
-    max_text_width = width_px - x - int(height_px * 0.05)
-    max_text_height = height_px - y_start - int(height_px * 0.05)
-    # Initial sizes
-    base_font_size = int(height_px * 0.08)
-    min_font_size = 10
-    # Function to compute block height for given font size
-
-    def compute_block_height(f_size):
-        return len(lines) * f_size + (len(lines) - 1) * int(f_size * 0.5)
-    # Scale font size down if block is too tall
-    font_size = base_font_size
-    while compute_block_height(font_size) > max_text_height and font_size > min_font_size:
-        font_size -= 1
-    # Now draw each line, adjusting horizontally too
-    y = y_start
-    for idx, text in enumerate(lines):
-        size = font_size
-        font = ImageFont.truetype(font_path, size)
-        # Shrink font horizontally if too wide
-        while draw.textlength(text, font=font) > max_text_width and size > min_font_size:
-            size -= 1
-            font = ImageFont.truetype(font_path, size)
-        draw.text((x, y), text, font=font, fill="black")
-        y += size + int(size * 0.5)
-
-    # Output PNG
-    bio = io.BytesIO()
-    label.save(bio, format="PNG")
-    bio.seek(0)
+    
+    # Delegate to reports.py
+    bio = create_label_image(inventory_id_val, name, category, serial, manufacturer, model)
+    
     return send_file(bio, mimetype="image/png", as_attachment=False, download_name=f"{inventory_id_val}.png")
-
 
 # PDF reports
 @app.route("/reports/items.pdf")
 @login_required
 def report_items_pdf():
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("""SELECT inventory_id, name, category, serial_number, manufacturer, model
-                   FROM items ORDER BY name""")
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
-
-    bio = io.BytesIO()
-    c = canvas.Canvas(bio, pagesize=A4, pageCompression=1)
-    width, height = A4
-    y = height - 20 * mm
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(20 * mm, y, "Item Inventory Report")
-    y -= 10 * mm
-    c.setFont("Helvetica", 10)
-    for r in rows:
-        line = f"{r[0]} | {r[1]} | {r[2] or ''} | SN:{r[3] or ''} | {r[4] or ''} {r[5] or ''}"
-        if y < 20 * mm:
-            c.showPage()
-            y = height - 20 * mm
-            c.setFont("Helvetica", 10)
-        c.drawString(15 * mm, y, line[:120])
-        y -= 6 * mm
-    c.showPage()
-    c.save()
-    bio.seek(0)
+    bio = create_items_pdf()
     return send_file(bio, mimetype="application/pdf", as_attachment=True, download_name="items_report.pdf")
 
 
 @app.route("/reports/production/<int:pid>.pdf")
 @login_required
 def report_production_pdf(pid):
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT id, name, date, notes FROM productions WHERE id=%s", (pid,))
-    prod = cur.fetchone()
-    if not prod:
-        cur.close()
-        conn.close()
+    result = create_production_pdf(pid)
+    if not result:
         abort(404)
-    cur.execute("""SELECT i.inventory_id, i.name, i.category, i.serial_number, i.manufacturer, i.model
-                   FROM production_items pi
-                   JOIN items i ON i.inventory_id = pi.inventory_id
-                   WHERE pi.production_id=%s
-                   ORDER BY i.name""", (pid,))
-    items = cur.fetchall()
-    cur.close()
-    conn.close()
-    bio = io.BytesIO()
-    c = canvas.Canvas(bio, pagesize=A4, pageCompression=1)
-    width, height = A4
-    # Define margins and usable width
-    margin_left = 20 * mm
-    max_width = width - (margin_left * 2)
-    y = height - 20 * mm
-    # Header
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(margin_left, y, f"BOM – {prod[1]}")
-    y -= 8 * mm
-    c.setFont("Helvetica", 10)
-    c.drawString(margin_left, y, f"Date: {prod[2] or 'TBD'}")
-    y -= 8 * mm
-    # --- Dynamic Notes Section ---
-    if prod[3]:
-        c.setFont("Helvetica-Bold", 10)
-        c.drawString(margin_left, y, "Notes:")
-        c.setFont("Helvetica", 10)
-        # Wrap the notes text to fit within max_width
-        note_lines = simpleSplit(prod[3], "Helvetica", 10, max_width)
-        for line in note_lines:
-            y -= 5 * mm
-            # Check for page end
-            if y < 20 * mm:
-                c.showPage()
-                y = height - 20 * mm
-            c.drawString(margin_left, y, line)
-        y -= 10 * mm  # Extra space after notes section
-    # --- Items List ---
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(margin_left, y, "Inventory ID | Item Name | Category | Details")
-    y -= 2 * mm
-    c.line(margin_left, y, width - margin_left, y)
-    y -= 6 * mm
-    for r in items:
-        # Construct text: ID | Name | Cat | SN | Manufacturer Model
-        details = f"SN:{r[3] or 'N/A'} | {r[4] or ''} {r[5] or ''}"
-        item_text = f"{r[0]} | {r[1]} | {r[2] or ''} | {details}"
-        wrapped_item = simpleSplit(item_text, "Helvetica", 10, max_width)
-        for i, line in enumerate(wrapped_item):
-            # Page overflow check
-            if y < 20 * mm:
-                c.showPage()
-                y = height - 20 * mm
-                c.setFont("Helvetica", 10)
-            # Indent subsequent lines of the same item for better readability
-            current_x = margin_left if i == 0 else margin_left + 4 * mm
-            c.drawString(current_x, y, line)
-            y -= 5 * mm
-        y -= 3 * mm  # Space between different items
-    c.showPage()
-    c.save()
-    bio.seek(0)
+    bio, prod_name = result
     return send_file(bio, mimetype="application/pdf", as_attachment=True, download_name=f"production_{pid}_BOM.pdf")
 
 
@@ -1478,26 +1270,16 @@ def uploads(filename):
 # --- Integrated Entry Point --- #
 
 def create_app():
-    """
-    Initializes the application logic.
-    This runs both in production (WSGI) and development (Manual).
-    """
     cfg = load_config()
     if not cfg.get("configured"):
-        # This prints to console or Apache error logs
         print("WARNING: App not configured. Visit /setup to initialize.")
     else:
-        # Run DB initialization/migrations if configured
         try:
             init_db()
         except Exception as e:
             print(f"ERROR: Could not initialize database: {e}")
     return app
-# WSGI entry point: Apache/mod_wsgi looks for an object named 'application'
-
 
 application = create_app()
 if __name__ == "__main__":
-    # This block ONLY runs if you type 'python app.py'
-    # Use application.run to ensure we use the instance returned by create_app()
     application.run(host="0.0.0.0", port=8000, debug=False)
