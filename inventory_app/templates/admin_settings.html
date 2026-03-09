@@ -18,7 +18,7 @@
       <hr>
       <p class="text-muted">Current logo preview:</p>
       <div class="border rounded d-inline-block p-3 bg-light mb-4">
-          <img src="/uploads/{{ cfg.logo_path.split('/')[-1] }}" style="max-height:120px" class="d-block mb-2">    
+          <img src="{{ url_for('uploads', filename=cfg.logo_path) }}" style="max-height:120px" class="d-block mb-2">    
           <div class="form-check">
               <input class="form-check-input" type="checkbox" name="remove_logo" id="removeLogo" value="yes">
               <label class="form-check-label text-danger" for="removeLogo">
