@@ -164,6 +164,7 @@ def test_edit_item_includes_suggestions(mock_get_suggestions, mock_load, authent
 
 
 @patch("inventory_app.app.load_config")
+@patch("inventory_app.reports.get_db")  # <--- NEW PATCH
 def test_inventory_pdf_report(mock_load, authenticated_client, mock_db):
     """Tests GET /reports/items.pdf."""
     mock_load.return_value = {"configured": True}
