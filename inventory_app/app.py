@@ -174,7 +174,7 @@ def inject_site_branding():
                 site_cfg[row[0]] = row[1]
             cur.close()
         except Exception:
-            pass 
+            pass
         finally:
             conn.close()
     return dict(site_cfg=site_cfg)
