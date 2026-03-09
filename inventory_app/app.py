@@ -6,28 +6,34 @@ import psutil
 from datetime import datetime
 from functools import wraps
 
-import mariadb
 from flask import (
-    Flask, render_template, request, redirect, url_for, flash,
-    send_file, abort, send_from_directory, jsonify
+    Flask, render_template, request, redirect,
+    url_for, flash, send_file, abort,
+    send_from_directory, jsonify
 )
 from flask_login import (
-    LoginManager, login_user, logout_user,
-    current_user, login_required, UserMixin
+    LoginManager, login_user, logout_user, current_user,
+    login_required, UserMixin
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
-# Import from our new modules
-from inventory_app.db import load_config, save_config, get_db, init_db, get_item_suggestions, APP_DIR, CONFIG_PATH
-from inventory_app.reports import create_label_image, create_items_pdf, create_production_pdf
-from inventory_app.security import ReservedUsername
-from inventory_app.version import get_current_version, get_beta_releases, get_stable_releases
-
-# Import Forms (Assuming you leave these here, or move them to forms.py)
-from inventory_app.forms import (
-    SetupForm, LoginForm, ItemForm, ProductionForm, UserAdminForm, UserProfileForm
+# Sub-module imports
+from inventory_app.db import (
+    load_config, save_config, get_db, init_db,
+    get_item_suggestions, APP_DIR
 )
+from inventory_app.reports import (
+    create_label_image, create_items_pdf, create_production_pdf
+)
+from inventory_app.forms import (
+    SetupForm, LoginForm, ItemForm, ProductionForm,
+    UserAdminForm, UserProfileForm
+)
+from inventory_app.version import (
+    get_current_version, get_beta_releases, get_stable_releases
+)
+
 
 UPLOAD_DIR = os.path.join(APP_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
