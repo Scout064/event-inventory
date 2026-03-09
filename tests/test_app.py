@@ -104,31 +104,35 @@ def test_items_search_query(mock_load, authenticated_client, mock_db):
 
 
 @patch("inventory_app.app.load_config")
-@patch("inventory_app.app.get_item_suggestions")
-def test_item_form_datalist_suggestions(mock_suggestions, mock_load, authenticated_client):
+def test_item_form_datalist_suggestions(mock_load, authenticated_client, mock_db):
     """
     Verifies that 'New Item' page fetches distinct values for
     Category, Manufacturer, and Model to populate datalists.
     """
     mock_load.return_value = {"configured": True}
-    mock_suggestions.return_value = {
-        "category": ["Audio", "Video"],
-        "manufacturer": ["Sony", "Shure"],
-        "model": ["SM58", "A7S"]
-    }
-
+    mock_cur = mock_db.cursor.return_value
+    # We expect 3 distinct queries for suggestions (Category, Manufacturer, Model)
+    # Returning a list of tuples for fetchall()
+    mock_cur.fetchall.side_effect = [
+        [("Audio",), ("Video",)],     # Categories
+        [("Sony",), ("Shure",)],     # Manufacturers
+        [("SM58",), ("A7S",)]        # Models
+    ]
     response = authenticated_client.get("/items/new")
     assert response.status_code == 200
-
-    # Check datalist structure
+    # Check for datalist structure
     assert b'id="category_list"' in response.data
     assert b'id="manufacturer_list"' in response.data
     assert b'id="model_list"' in response.data
-
-    # Check specific suggestion values
+    # Check for specific suggestion values
     assert b'value="Audio"' in response.data
     assert b'value="Sony"' in response.data
     assert b'value="SM58"' in response.data
+    # Verify the logic called the database for distinct values
+    executed_queries = [call[0][0].lower() for call in mock_cur.execute.call_args_list]
+    assert any("select distinct category" in q for q in executed_queries)
+    assert any("select distinct manufacturer" in q for q in executed_queries)
+    assert any("select distinct model" in q for q in executed_queries)
 
 
 @patch("inventory_app.app.load_config")
