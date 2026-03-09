@@ -371,7 +371,7 @@ def items_import():
 
 @app.route("/items/search")
 @login_required
-def api_items_search():
+def search():
     q = request.args.get("q", "").strip()
     if not q: return jsonify({"items": []})
     conn = get_db()
