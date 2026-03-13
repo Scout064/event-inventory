@@ -1,5 +1,7 @@
 import re
-from flask_login import current_user
+from functools import wraps
+from flask import flash, redirect, url_for, current_app
+from flask_login import current_user, UserMixin
 from wtforms.validators import ValidationError
 
 LEET_MAP = str.maketrans({
@@ -44,6 +46,26 @@ RESERVED_USERNAMES = {
 RESERVED_PATTERNS = re.compile(
     r"(admin|administrator|root|superuser|sysadmin|moderator|staff|support|owner)"
 )
+
+
+class User(UserMixin):
+    def __init__(self, id, username, password_hash, is_admin):
+        self.id = str(id)
+        self.username = username
+        self.password_hash = password_hash
+        self.is_admin = bool(is_admin)
+
+
+def admin_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return current_app.login_manager.unauthorized()
+        if not getattr(current_user, "is_admin", False):
+            flash("Admin access required.", "warning")
+            return redirect(url_for("index"))
+        return f(*args, **kwargs)
+    return wrapper
 
 
 def normalize_username(username: str) -> str:
