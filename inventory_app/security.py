@@ -46,6 +46,26 @@ RESERVED_PATTERNS = re.compile(
 )
 
 
+class User(UserMixin):
+    def __init__(self, id, username, password_hash, is_admin):
+        self.id = str(id)
+        self.username = username
+        self.password_hash = password_hash
+        self.is_admin = bool(is_admin)
+
+
+def admin_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return current_app.login_manager.unauthorized()
+        if not getattr(current_user, "is_admin", False):
+            flash("Admin access required.", "warning")
+            return redirect(url_for("index"))
+        return f(*args, **kwargs)
+    return wrapper
+
+
 def normalize_username(username: str) -> str:
     username = username.lower()
     username = username.translate(LEET_MAP)
