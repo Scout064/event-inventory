@@ -1,7 +1,7 @@
 import os
 import json
 import mariadb
-
+from werkzeug.security import generate_password_hash
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(APP_DIR, "config.json")
