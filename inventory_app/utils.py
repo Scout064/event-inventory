@@ -9,6 +9,7 @@ QR_DIR = os.path.join(APP_DIR, "static", "qr_codes")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(QR_DIR, exist_ok=True)
 
+
 def save_logo(file):
     """Validates and saves the uploaded logo file."""
     filename = secure_filename(file.filename)
