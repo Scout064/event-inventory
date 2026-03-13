@@ -3,7 +3,6 @@ import re
 import io
 import csv
 import psutil
-from functools import wraps
 from datetime import datetime
 
 import mariadb
@@ -12,33 +11,23 @@ from flask import (
     send_file, abort, send_from_directory, jsonify
 )
 from flask_login import (
-    LoginManager, login_user, logout_user,
-    current_user, login_required, UserMixin
+    LoginManager, login_user, logout_user, current_user, login_required
 )
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
 
-# Import from our new modules
+# Import from our modules
 from inventory_app.db import (
     load_config, save_config, get_db, init_db, get_item_suggestions,
-    APP_DIR
+    APP_DIR, find_user_by_username, find_user_by_id, create_users,
+    process_item_row, _execute_profile_update
 )
 from inventory_app.forms import (
-    SetupForm, LoginForm, ItemForm, ProductionForm,
-    UserAdminForm, UserProfileForm
+    SetupForm, LoginForm, ItemForm, ProductionForm, UserAdminForm, UserProfileForm
 )
-from inventory_app.reports import (
-    create_label_image, create_items_pdf, create_production_pdf
-)
-from inventory_app.version import (
-    get_current_version, get_beta_releases, get_stable_releases
-)
-
-
-UPLOAD_DIR = os.path.join(APP_DIR, "uploads")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-QR_DIR = os.path.join(APP_DIR, "static", "qr_codes")
-os.makedirs(QR_DIR, exist_ok=True)
+from inventory_app.reports import create_label_image, create_items_pdf, create_production_pdf
+from inventory_app.version import get_current_version, get_beta_releases, get_stable_releases
+from inventory_app.security import User, admin_required
+from inventory_app.utils import save_logo
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-change-me")
@@ -50,7 +39,6 @@ LAN_REGEX = re.compile(
     r"^(127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|"
     r"172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+)$"
 )
-
 
 @app.before_request
 def enforce_https():
@@ -69,98 +57,15 @@ def enforce_https():
         return redirect(secure_url, code=301)
 
 
-class User(UserMixin):
-    def __init__(self, id, username, password_hash, is_admin):
-        self.id = str(id)
-        self.username = username
-        self.password_hash = password_hash
-        self.is_admin = bool(is_admin)
-
-
-def find_user_by_username(username):
-    conn = get_db()
-    if not conn:
-        return None
-    cur = conn.cursor()
-    cur.execute(
-        "SELECT id, username, password_hash, is_admin FROM users WHERE username=%s",
-        (username,),
-    )
-    row = cur.fetchone()
-    cur.close()
-    conn.close()
-    if row:
-        return User(*row)
-    return None
-
-
-def find_user_by_id(user_id):
-    conn = get_db()
-    if not conn:
-        return None
-    cur = conn.cursor()
-    cur.execute(
-        "SELECT id, username, password_hash, is_admin FROM users WHERE id=%s",
-        (user_id,),
-    )
-    row = cur.fetchone()
-    cur.close()
-    conn.close()
-    if row:
-        return User(*row)
-    return None
-
-
 @login_manager.user_loader
 def load_user(user_id):
     cfg = load_config()
     if not cfg.get("configured"):
         return None
-    return find_user_by_id(user_id)
-
-
-def admin_required(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        if not current_user.is_authenticated:
-            return login_manager.unauthorized()
-        if not getattr(current_user, "is_admin", False):
-            flash("Admin access required.", "warning")
-            return redirect(url_for("index"))
-        return f(*args, **kwargs)
-    return wrapper
-
-
-def save_logo(file):
-    filename = secure_filename(file.filename)
-    ext = os.path.splitext(filename)[1].lower()
-    if ext not in [".png", ".jpg", ".jpeg"]:
-        raise ValueError("Invalid logo type")
-    path = os.path.join(UPLOAD_DIR, "company_logo" + ext)
-    file.save(path)
-    return path
-
-
-def create_users(cur, admin_data, default_data=None):
-    cur.execute("SELECT id FROM users WHERE username=%s", (admin_data["username"],))
-    if not cur.fetchone():
-        cur.execute(
-            "INSERT INTO users (username,password_hash,is_admin) VALUES (%s,%s,%s)",
-            (admin_data["username"], generate_password_hash(admin_data["password"]), True),
-        )
-    if default_data:
-        cur.execute(
-            "SELECT id FROM users WHERE username=%s", (default_data["username"],)
-        )
-        if not cur.fetchone():
-            cur.execute(
-                "INSERT INTO users (username,password_hash,is_admin) VALUES (%s,%s,%s)",
-                (
-                    default_data["username"],
-                    generate_password_hash(default_data["password"]),
-                    False,
-                ),
-            )
+    row = find_user_by_id(user_id)
+    if row:
+        return User(*row)
+    return None
 
 
 @app.context_processor
@@ -250,9 +155,10 @@ def login():
         return redirect(url_for("setup"))
     form = LoginForm()
     if form.validate_on_submit():
-        user = find_user_by_username(form.username.data.strip())
-        if user and check_password_hash(user.password_hash, form.password.data):
-            login_user(user, remember=form.remember.data)
+        row = find_user_by_username(form.username.data.strip())
+        # Index 2 is password_hash in the tuple returned from DB
+        if row and check_password_hash(row[2], form.password.data):
+            login_user(User(*row), remember=form.remember.data)
             return redirect(url_for("index"))
         flash("Invalid credentials", "danger")
     return render_template("login.html", form=form)
@@ -271,7 +177,6 @@ def index():
     return render_template("index.html")
 
 
-# Items
 @app.route('/items')
 @login_required
 def items():
@@ -433,38 +338,6 @@ def items_download_template():
     )
 
 
-def process_item_row(cur, row):
-    cleaned = {k: (v.strip() if v else '') for k, v in row.items() if k}
-    if not any(cleaned.values()):
-        return 0
-    inv_id = cleaned.get('inventory_id', '')
-    name = cleaned.get('name', '')
-    if not inv_id or not name:
-        return 3
-    try:
-        cur.execute("""
-            INSERT INTO items (inventory_id, name, category, description,
-                               serial_number, manufacturer, model)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (
-            inv_id,
-            name,
-            cleaned.get('category') or None,
-            cleaned.get('description') or None,
-            cleaned.get('serial_number') or None,
-            cleaned.get('manufacturer') or None,
-            cleaned.get('model') or None
-        ))
-        return 1
-    except mariadb.IntegrityError as ie:
-        if ie.errno == 1062:
-            return 2
-        return 3
-    except Exception as e:
-        print(f"Row Exception: {e}")
-        return 3
-
-
 @app.route("/items/import", methods=["GET", "POST"])
 @login_required
 def items_import():
@@ -521,7 +394,6 @@ def api_items_search():
         conn.close()
 
 
-# Productions
 @app.route("/productions")
 @login_required
 def productions():
@@ -756,7 +628,6 @@ def label_png(inventory_id):
 
     inventory_id_val, name, category, serial, manufacturer, model = (str(v or '') for v in row)
 
-    # Delegate to reports.py
     bio = create_label_image(inventory_id_val, name, category, serial, manufacturer, model)
     return send_file(bio, mimetype="image/png", as_attachment=False, download_name=f"{inventory_id_val}.png")
 
@@ -819,20 +690,6 @@ def search():
         productions=productions_list,
         users=users_list
     )
-
-
-def _execute_profile_update(cur, user_id, uname, rname, email, bday, pw_hash=None):
-    if pw_hash:
-        query = """UPDATE users
-                   SET username=%s, real_name=%s, email=%s, birthday=%s, password_hash=%s
-                   WHERE id=%s"""
-        params = (uname, rname, email, bday, pw_hash, user_id)
-    else:
-        query = """UPDATE users
-                   SET username=%s, real_name=%s, email=%s, birthday=%s
-                   WHERE id=%s"""
-        params = (uname, rname, email, bday, user_id)
-    cur.execute(query, params)
 
 
 @app.route("/profile", methods=["GET", "POST"])
