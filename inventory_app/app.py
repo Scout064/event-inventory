@@ -40,6 +40,7 @@ LAN_REGEX = re.compile(
     r"172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+)$"
 )
 
+
 @app.before_request
 def enforce_https():
     cfg = load_config()
