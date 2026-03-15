@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5">
+    <div class="card shadow-sm mx-auto" style="max-width: 500px;">
+        <div class="card-header bg-dark text-white text-center py-3">
+            <h4 class="mb-0">About Inventory System</h4>
+        </div>
+        <div class="card-body text-center py-5">
+            <div class="mb-3">
+                <i class="bi bi-info-circle-fill text-primary" style="font-size: 3rem;"></i>
+            </div>
+            <h5 class="card-title">System Information</h5>
+            <p class="card-text text-muted mb-4">
+                This application is used for managing equipment inventory,
+                labels, and production tracking.
+            </p>
+            <div class="p-3 bg-light rounded mb-4">
+                <span class="text-secondary small text-uppercase fw-bold d-block mb-1">
+                    Current Version
+                </span>
+                <span class="badge bg-primary fs-6">{{ currentVersion }}</span>
+            </div>
+
+            {% if current_user.is_admin and stats %}
+            <h6 class="text-uppercase text-muted mb-3 mt-4">Server Statistics</h6>
+            <div class="row text-start mb-4 g-2">
+                <div class="col-6">
+                    <div class="p-2 border rounded">
+                        <div class="small text-muted fw-bold">CPU Load</div>
+                        <div>{{ stats.cpu_percent }}%</div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="p-2 border rounded">
+                        <div class="small text-muted fw-bold">RAM Usage</div>
+                        <div>{{ stats.ram_percent }}% of {{ stats.ram_total }} GB</div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="p-2 border rounded">
+                        <div class="small text-muted fw-bold">Disk Space</div>
+                        <div>{{ stats.disk_percent }}% of {{ stats.disk_total }} GB</div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="p-2 border rounded">
+                        <div class="small text-muted fw-bold">Database Size</div>
+                        <div>{{ stats.db_size }}</div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <h6 class="text-uppercase text-muted mb-3">Available Stable Releases</h6>
+            <ul class="list-group text-start mb-4">
+                {% for r in releases %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>{{ r.version }}</strong>
+                        {% if r.prerelease %}
+                            <span class="badge bg-warning text-dark ms-1">Beta</span>
+                        {% endif %}
+                        <div class="small text-muted">
+                            {{ r.published[:10] }}
+                        </div>
+                    </div>
+                    <a href="{{ r.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                        View
+                    </a>
+                </li>
+                {% else %}
+                <li class="list-group-item text-muted text-center small">No stable releases found.</li>
+                {% endfor %}
+            </ul>
+
+            <h6 class="text-uppercase text-muted mb-3">Available Beta Releases</h6>
+            <ul class="list-group text-start">
+                {% for r in beta %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>{{ r.version }}</strong>
+                        {% if r.prerelease %}
+                            <span class="badge bg-warning text-dark ms-1">Beta</span>
+                        {% endif %}
+                        <div class="small text-muted">
+                            {{ r.published[:10] }}
+                        </div>
+                    </div>
+                    <a href="{{ r.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                        View
+                    </a>
+                </li>
+                {% else %}
+                <li class="list-group-item text-muted text-center small">No beta releases found.</li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div class="card-footer text-muted text-center small py-2">
+            © 2026 - Now | Mössner Audio | info (at) moessner-audio.de
+        </div>
+    </div>
+</div>
+{% endblock %}

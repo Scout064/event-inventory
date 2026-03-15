@@ -12,9 +12,15 @@
 </style>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h3>Items</h3>
+  <h3>Items ({{ total_items }})</h3>
   <div class="d-flex gap-2">
-    <input type="text" id="itemFilter" class="form-control" placeholder="Search items...">
+    <form action="{{ url_for('items') }}" method="get" class="d-flex gap-2">
+      <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Search items..." style="width: 250px;">
+      <button type="submit" class="btn btn-outline-primary">Search</button>
+      {% if q %}
+        <a href="{{ url_for('items') }}" class="btn btn-outline-secondary">Clear</a>
+      {% endif %}
+    </form>
     
     <div class="dropdown">
       <button class="btn btn-outline-secondary dropdown-toggle text-nowrap" type="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -38,7 +44,7 @@
         <h5 class="modal-title" id="importModalLabel">Bulk Import Items</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <form action="{{ url_for('items_import') }}" method="post" enctype="multipart/form-data">
+      <form id="importForm" action="{{ url_for('items_import') }}" method="post" enctype="multipart/form-data">
         <div class="modal-body">
           <p class="text-muted small">Upload a CSV file using the standard template. Existing Inventory IDs will be updated with the new values provided in the file.</p>
           <div class="mb-3">
@@ -83,65 +89,68 @@
         </form>
       </td>
     </tr>
+  {% else %}
+    <tr>
+      <td colspan="7" class="text-center py-4 text-muted">No items found matching your criteria.</td>
+    </tr>
   {% endfor %}
   </tbody>
 </table>
 
+{% if total_pages > 1 %}
+<nav aria-label="Item navigation" class="mt-4">
+  <ul class="pagination justify-content-center">
+    <li class="page-item {{ 'disabled' if page <= 1 }}">
+      <a class="page-link" href="{{ url_for('items', page=page-1, q=q) if page > 1 else '#' }}">Previous</a>
+    </li>
 
+    {% for p in range(1, total_pages + 1) %}
+      {% if p == page %}
+        <li class="page-item active"><span class="page-link">{{ p }}</span></li>
+      {% elif p > page - 3 and p < page + 3 or p == 1 or p == total_pages %}
+        <li class="page-item"><a class="page-link" href="{{ url_for('items', page=p, q=q) }}">{{ p }}</a></li>
+      {% elif p == page - 3 or p == page + 3 %}
+        <li class="page-item disabled"><span class="page-link">...</span></li>
+      {% endif %}
+    {% endfor %}
+
+    <li class="page-item {{ 'disabled' if page >= total_pages }}">
+      <a class="page-link" href="{{ url_for('items', page=page+1, q=q) if page < total_pages else '#' }}">Next</a>
+    </li>
+  </ul>
+</nav>
+{% endif %}
 
 <script>
-  // --- 1. SEARCH FILTER LOGIC ---
-  document.getElementById('itemFilter').addEventListener('keyup', function() {
-    const filter = this.value.toLowerCase();
-    const rows = document.querySelectorAll('#itemTableBody tr');
-    rows.forEach(row => {
-      row.style.display = row.textContent.toLowerCase().includes(filter) ? '' : 'none';
-    });
+  // Prevents multiple clicks on the CSV import button
+  document.getElementById('importForm').addEventListener('submit', function() {
+    const btn = document.getElementById('importBtn');
+    
+    // Disable the button to prevent double-submission
+    btn.disabled = true;
+    
+    // Optional: Add a loading spinner and change text for better UX
+    btn.innerHTML = `
+      <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+      Importing...
+    `;
   });
-
-  // --- 2. TABLE SORT LOGIC ---
+  // TABLE SORT LOGIC (remains frontend-only for the current page of 100 items)
   function sortTable(n) {
     const table = document.getElementById("inventoryTable");
-    let switching = true;
-    let dir = "asc"; 
-    let switchcount = 0;
-
+    let switching = true, dir = "asc", switchcount = 0;
     while (switching) {
       switching = false;
       const rows = table.rows;
       for (var i = 1; i < (rows.length - 1); i++) {
         var shouldSwitch = false;
-        var x = rows[i].getElementsByTagName("TD")[n];
-        var y = rows[i + 1].getElementsByTagName("TD")[n];
-
-        var xVal = x.textContent.toLowerCase();
-        var yVal = y.textContent.toLowerCase();
-
-        // Check if values are numeric for proper sorting
-        var xNum = parseFloat(xVal);
-        var yNum = parseFloat(yVal);
-        
-        if (!isNaN(xNum) && !isNaN(yNum)) {
-          xVal = xNum;
-          yVal = yNum;
-        }
-
-        if (dir == "asc") {
-          if (xVal > yVal) { shouldSwitch = true; break; }
-        } else if (dir == "desc") {
-          if (xVal < yVal) { shouldSwitch = true; break; }
-        }
+        var x = rows[i].getElementsByTagName("TD")[n], y = rows[i + 1].getElementsByTagName("TD")[n];
+        var xVal = x.textContent.toLowerCase(), yVal = y.textContent.toLowerCase();
+        if (dir == "asc") { if (xVal > yVal) { shouldSwitch = true; break; } }
+        else { if (xVal < yVal) { shouldSwitch = true; break; } }
       }
-      if (shouldSwitch) {
-        rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
-        switching = true;
-        switchcount ++;      
-      } else {
-        if (switchcount == 0 && dir == "asc") {
-          dir = "desc";
-          switching = true;
-        }
-      }
+      if (shouldSwitch) { rows[i].parentNode.insertBefore(rows[i + 1], rows[i]); switching = true; switchcount++; }
+      else if (switchcount == 0 && dir == "asc") { dir = "desc"; switching = true; }
     }
   }
 </script>

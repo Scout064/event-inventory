@@ -2,51 +2,86 @@
 {% block content %}
 <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <div>
-    <h3>{{ prod[1] }}</h3>
-    <div class="text-muted">Date: {{ prod[2] or '' }}</div>
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2>Production: {{ prod[1] }}</h2>
+  <div class="d-flex gap-2">
+    <form action="{{ url_for('productions_clear_all', pid=prod[0]) }}" method="POST" onsubmit="return confirm('Are you sure you want to remove ALL items?');">
+        <button type="submit" class="btn btn-outline-danger">Clear All Items</button>
+    </form>
+    <a class="btn btn-outline-info" href="{{ url_for('report_production_pdf', pid=prod[0]) }}" target="_blank">
+      Download BOM PDF
+    </a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('productions') }}">Back to List</a>
   </div>
-  <div>
-    <a class="btn btn-outline-secondary" href="{{ url_for('report_production_pdf', pid=prod[0]) }}">BOM PDF</a>
-    <a class="btn btn-secondary" href="{{ url_for('productions') }}">Back</a>
+</div>
+
+<div class="card mb-4 shadow-sm">
+  <div class="card-body">
+    <div class="row">
+      <div class="col-md-3">
+        <strong class="text-muted">Date:</strong><br>
+        <span class="fs-5">{{ prod[2] or 'TBD' }}</span>
+      </div>
+      <div class="col-md-9">
+        <strong class="text-muted">Notes:</strong><br>
+        <span>{{ prod[3] or 'No notes provided.' }}</span>
+      </div>
+    </div>
   </div>
 </div>
 
 <div class="row">
-  <div class="col-md-7">
-    <h5>Assigned Items</h5>
-    <table class="table table-sm table-striped">
-      <thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Serial</th><th></th></tr></thead>
-      <tbody>
-      {% for r in items %}
-        <tr>
-          <td>{{ r[0] }}</td>
-          <td>{{ r[1] }}</td>
-          <td>{{ r[2] or '' }}</td>
-          <td>{{ r[3] or '' }}</td>
-          <td class="text-end">
-            <form action="{{ url_for('productions_remove', pid=prod[0]) }}" method="post" style="display:inline">
-              <input type="hidden" name="inventory_id" value="{{ r[0] }}">
-              <button class="btn btn-sm btn-outline-danger">Remove</button>
-            </form>
-          </td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
+  <div class="col-md-7 mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h4>Assigned Items ({{ items|length }})</h4>
+        <button type="submit" form="batchRemoveForm" class="btn btn-sm btn-danger" id="batchDeleteBtn" disabled>
+            Remove Selected
+        </button>
+    </div>
+    
+    <div class="card shadow-sm">
+      <form id="batchRemoveForm" action="{{ url_for('productions_batch_remove', pid=prod[0]) }}" method="POST">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th style="width: 40px;"><input type="checkbox" id="selectAll" class="form-check-input"></th>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Category</th>
+                <th class="text-end">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in items %}
+              <tr>
+                <td><input type="checkbox" name="item_ids" value="{{ r[0] }}" class="form-check-input item-checkbox"></td>
+                <td><span class="fw-bold">{{ r[0] }}</span></td>
+                <td>{{ r[1] }}</td>
+                <td><span class="badge bg-light text-dark">{{ r[2] or '' }}</span></td>
+                <td class="text-end">
+                  <button type="button" class="btn btn-sm btn-link text-danger p-0 text-decoration-none" onclick="confirmSingleRemove('{{ r[0] }}', '{{ r[1] }}')">Remove</button>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5" class="text-center py-4 text-muted">No items assigned.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+      </form>
+    </div>
   </div>
   
+  <form id="singleRemoveForm" action="{{ url_for('productions_remove', pid=prod[0]) }}" method="POST" style="display:none;">
+    <input type="hidden" name="inventory_id" id="singleRemoveId">
+  </form>
+
   <div class="col-md-5">
     <h5>Add Item to Production</h5>
     <form action="{{ url_for('productions_assign', pid=prod[0]) }}" method="post">
       <div class="mb-2">
         <select id="item-search-select" name="inventory_id" placeholder="Search by name or ID...">
           <option value="">Search by name or ID...</option>
-          {% for i in all_items %}
-            <option value="{{ i[0] }}">{{ i[1] }} ({{ i[0] }})</option>
-          {% endfor %}
-        </select>
+          </select>
       </div>
       <button class="btn btn-primary w-100">Add Item</button>
     </form>
@@ -54,16 +89,64 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+
 <script>
   document.addEventListener("DOMContentLoaded", function() {
+    // TomSelect logic (Preserved from your original file)
     new TomSelect("#item-search-select", {
-      create: false,
-      sortField: {
-        field: "text",
-        direction: "asc"
+      valueField: 'id',
+      labelField: 'name',
+      searchField: ['name', 'id'],
+      placeholder: 'Search by name or ID...',
+      shouldLoad: function(query) { return query.length >= 1; },
+      load: function(query, callback) {
+        fetch('{{ url_for("api_items_search") }}?q=' + encodeURIComponent(query))
+          .then(response => response.json())
+          .then(json => { callback(json.items); })
+          .catch(() => { callback(); });
       },
-      maxOptions: 50 // Limits how many items show at once to keep the browser fast
+      render: {
+        option: function(item, escape) {
+          return `<div class="py-2 px-3">
+                    <div class="fw-bold text-dark">${escape(item.name)}</div>
+                    <div class="text-muted small">ID: ${escape(item.id)}</div>
+                  </div>`;
+        },
+        item: function(item, escape) {
+          return `<div><span class="fw-bold">${escape(item.name)}</span> <span class="text-muted small">(${escape(item.id)})</span></div>`;
+        }
+      }
     });
+
+    // --- Checkbox Logic ---
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.item-checkbox');
+    const batchBtn = document.getElementById('batchDeleteBtn');
+
+    if(selectAll) {
+        selectAll.addEventListener('change', function() {
+            checkboxes.forEach(cb => cb.checked = selectAll.checked);
+            updateBatchButton();
+        });
+    }
+
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', updateBatchButton);
+    });
+
+    function updateBatchButton() {
+        const checkedCount = document.querySelectorAll('.item-checkbox:checked').length;
+        batchBtn.disabled = checkedCount === 0;
+        batchBtn.textContent = checkedCount > 0 ? `Remove Selected (${checkedCount})` : 'Remove Selected';
+    }
   });
+
+  // Helper for single removal to keep HTML valid (avoids nested forms)
+  function confirmSingleRemove(id, name) {
+      if (confirm(`Remove ${name} from production?`)) {
+          document.getElementById('singleRemoveId').value = id;
+          document.getElementById('singleRemoveForm').submit();
+      }
+  }
 </script>
 {% endblock %}
