@@ -946,6 +946,7 @@ def trigger_update():
                 data = json.load(f)
                 branch = data.get("branch", "main")
         except Exception as e:
+            print(f"WARNING: Could not get branch: {e}")
             pass
 
     def generate_output():
