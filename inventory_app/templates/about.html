@@ -33,7 +33,7 @@
                 <div class="col-6">
                     <div class="p-2 border rounded">
                         <div class="small text-muted fw-bold">RAM Usage</div>
-                        <div>{{ stats.ram_percent }}% of {{ stats.ram_total }} GB</div>
+                        <div>{{ stats.memory_percent }}%</div>
                     </div>
                 </div>
                 <div class="col-6">
@@ -49,17 +49,37 @@
                     </div>
                 </div>
             </div>
+                <div class="col-6">
+                    <div class="p-2 border rounded">
+                        <div class="small text-muted fw-bold">Uptime</div>
+                        <div>{{ stats.uptime }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <hr class="my-4">
+            <h6 class="text-uppercase text-muted mb-3">System Maintenance</h6>
+
+            <button id="updateBtn" class="btn btn-warning w-100 fw-bold mb-4">
+                <i class="bi bi-cloud-arrow-down-fill me-2"></i> Run System Update
+            </button>
+
+            <div id="updateContainer" class="mb-4 text-start" style="display: none;">
+                <div class="progress mb-2" style="height: 25px;">
+                    <div id="updateProgressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-warning text-dark fw-bold" role="progressbar" style="width: 100%">
+                        Updating... Do not close this page.
+                    </div>
+                </div>
+                <pre id="updateLog" class="bg-dark text-light p-3 rounded shadow-sm" style="max-height: 250px; overflow-y: auto; font-size: 0.85rem; font-family: monospace;"></pre>
+            </div>
             {% endif %}
-            
+
             <h6 class="text-uppercase text-muted mb-3">Available Stable Releases</h6>
             <ul class="list-group text-start mb-4">
-                {% for r in releases %}
+                {% for r in stable %}
                 <li class="list-group-item d-flex justify-content-between align-items-center">
                     <div>
                         <strong>{{ r.version }}</strong>
-                        {% if r.prerelease %}
-                            <span class="badge bg-warning text-dark ms-1">Beta</span>
-                        {% endif %}
                         <div class="small text-muted">
                             {{ r.published[:10] }}
                         </div>
@@ -96,8 +116,73 @@
             </ul>
         </div>
         <div class="card-footer text-muted text-center small py-2">
-            © 2026 - Now | Mössner Audio | info (at) moessner-audio.de
+            &copy; 2026 - Now | Mössner Audio | info (at) moessner-audio.de
         </div>
     </div>
 </div>
+
+{% if current_user.is_admin %}
+<script>
+document.getElementById('updateBtn')?.addEventListener('click', async function() {
+    if (!confirm('Are you sure you want to run the system update? This will pull the latest code and restart the web server, causing brief downtime.')) return;
+    
+    this.disabled = true;
+    const container = document.getElementById('updateContainer');
+    const logEl = document.getElementById('updateLog');
+    
+    container.style.display = 'block';
+    logEl.textContent = "Initializing update sequence...\n";
+    
+    try {
+        // Trigger the backend route that streams the bash script output
+        const response = await fetch('{{ url_for("trigger_update") }}', { method: 'POST' });
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            // Decode the stream chunk and parse SSE format
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n');
+            
+            lines.forEach(line => {
+                if (line.startsWith('data: ')) {
+                    const msg = line.substring(6);
+                    if (msg === "DONE") {
+                        logEl.textContent += "\nUpdate script finished successfully. Reloading interface...\n";
+                        setTimeout(() => window.location.reload(), 2000);
+                    } else {
+                        logEl.textContent += msg + "\n";
+                        logEl.scrollTop = logEl.scrollHeight; // Auto-scroll to bottom
+                    }
+                }
+            });
+        }
+    } catch (err) {
+        // This catch block is highly likely to trigger because the `systemctl restart`
+        // command in your update.sh will abruptly kill the fetch request connection.
+        // This is actually a sign of success!
+        logEl.textContent += "\n[Server connection lost. The service is restarting.]\n";
+        logEl.textContent += "Waiting for the web interface to come back online...\n";
+        
+        // Polling loop to quietly ping the server until it responds again
+        const pingServer = setInterval(async () => {
+            try {
+                // Ping the homepage to see if the server is back up
+                const check = await fetch('{{ url_for("index") }}', { method: 'HEAD' });
+                if (check.ok) {
+                    clearInterval(pingServer);
+                    logEl.textContent += "\nServer is back online! Reloading...\n";
+                    setTimeout(() => window.location.reload(), 1000);
+                }
+            } catch (e) {
+                logEl.textContent += "."; // visual indicator that we are waiting
+            }
+        }, 2000);
+    }
+});
+</script>
+{% endif %}
 {% endblock %}
