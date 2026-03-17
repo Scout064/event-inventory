@@ -49,8 +49,7 @@
                     </div>
                 </div>
             </div>
-            </div>
-
+            
             <hr class="my-4">
             <h6 class="text-uppercase text-muted mb-3">System Maintenance</h6>
 
@@ -70,7 +69,7 @@
 
             <h6 class="text-uppercase text-muted mb-3">Available Stable Releases</h6>
             <ul class="list-group text-start mb-4">
-                {% for r in stable %}
+                {% for r in releases %}
                 <li class="list-group-item d-flex justify-content-between align-items-center">
                     <div>
                         <strong>{{ r.version }}</strong>
