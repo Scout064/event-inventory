@@ -3,7 +3,10 @@ import re
 import io
 import csv
 import psutil
+import subprocess
+import json
 from datetime import datetime
+from flask import Response
 
 import mariadb
 from flask import (
@@ -928,6 +931,50 @@ def create_app():
         except Exception as e:
             print(f"ERROR: Could not initialize database: {e}")
     return app
+
+
+@app.route("/admin/update", methods=["POST"])
+@login_required
+@admin_required
+def trigger_update():
+    version_path = os.path.join(APP_DIR, "version.json")
+    branch = "main"  # Fallback branch
+
+    if os.path.exists(version_path):
+        try:
+            with open(version_path, "r") as f:
+                data = json.load(f)
+                branch = data.get("branch", "main")
+        except Exception as e:
+            print(f"WARNING: Could not get branch: {e}")
+            pass
+
+    def generate_output():
+        yield f"data: Starting update process for branch: {branch}...\n\n"
+        script_path = os.path.join(APP_DIR, "webupdate.sh")
+
+        if not os.path.exists(script_path):
+            yield f"data: ERROR: Update script not found at {script_path}\n\n"
+            yield "data: DONE\n\n"
+            return
+
+        # Run the bash script and capture stdout/stderr together
+        process = subprocess.Popen(
+            ["/bin/bash", script_path, branch],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True
+        )
+
+        # Stream output line-by-line to the frontend
+        for line in iter(process.stdout.readline, ''):
+            yield f"data: {line}\n\n"
+
+        process.stdout.close()
+        process.wait()
+        yield "data: DONE\n\n"
+
+    return Response(generate_output(), mimetype='text/event-stream')
 
 
 application = create_app()
