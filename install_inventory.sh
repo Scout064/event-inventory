@@ -218,6 +218,16 @@ else
     rm -f "$SUDOERS_FILE"
 fi
 
+# ---------------------------------------------------------
+# Set up Web Update Log
+# ---------------------------------------------------------
+echo "--- Configuring Web Update Log ---"
+UPDATE_LOG="/var/log/apache2/inventory_webupdate.log"
+touch "$UPDATE_LOG"
+# Give the web user ownership so the update script can write to it
+chown www-data:adm "$UPDATE_LOG"
+chmod 664 "$UPDATE_LOG"
+
 echo "========================================================="
 echo "✅ Installation complete!"
 echo "URL: http://$SERVER_NAME"
