@@ -951,7 +951,7 @@ def trigger_update():
 
     def generate_output():
         yield f"data: Starting update process for branch: {branch}...\n\n"
-        script_path = os.path.join(APP_DIR, "update.sh")
+        script_path = os.path.join(APP_DIR, "webupdate.sh")
 
         if not os.path.exists(script_path):
             yield f"data: ERROR: Update script not found at {script_path}\n\n"
