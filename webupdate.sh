@@ -1,4 +1,4 @@
-#!/bin/bash
+v#!/bin/bash
 # File: update.sh
 # Usage: ./update.sh [branch_name]
 
@@ -59,6 +59,5 @@ mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$APP_DIR/inventory_
 # but you can safely paste your CURRENT_VER checks right here!
 
 # 7. Restart Web Service
-echo "Restarting web service..."
-# This requires the specific NOPASSWD rule in /etc/sudoers
-sudo /usr/bin/systemctl restart inventory
+echo "Restarting application..."
+touch "$APP_DIR/wsgi.py"
