@@ -54,6 +54,15 @@ def get_beta_releases(limit=5):
 
 
 def get_current_version():
+    version_info = []
     with open(VERSION_PATH, "r", encoding="utf-8") as f:
         data = json.load(f)
-    return data["version"]
+        version_info = [
+            for r in data:
+                version_info.append({
+                    "version": r["version"],
+                    "buildDate": r["buildDate"],
+                    "branch": r["branch"]
+                })
+    return version_info
+#    return data["version"]
