@@ -57,7 +57,6 @@ def get_current_version():
     version_info = []
     with open(VERSION_PATH, "r", encoding="utf-8") as f:
         data = json.load(f)
-        version_info = [
             for r in data:
                 version_info.append({
                     "version": r["version"],
