@@ -70,7 +70,7 @@ mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$APP_DIR/inventory_
 # 8. Restart Web Service
 echo "Restarting application..."
 touch "$APP_DIR/wsgi.py"
-sudo /usr/bin/systemctl restart inventory
+sudo /usr/bin/systemctl restart apache2
 
 echo "--- Deployment Complete ---"
 echo "You can find the output of this run under:"
