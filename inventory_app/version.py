@@ -63,5 +63,5 @@ def get_current_version():
                 "buildDate": r["buildDate"],
                 "branch": r["branch"]
             })
-    return version_info
-#    return data["version"]
+#    return version_info
+    return data["version"]
