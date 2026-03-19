@@ -15,14 +15,16 @@
                 labels, and production tracking.
             </p>
             <div class="p-3 bg-light rounded mb-4">
+                {% for r in version_info %}
                 <span class="text-secondary small text-uppercase fw-bold d-block mb-1">
                     Current Version
                 </span>
-                <span class="badge bg-primary fs-6">{{ currentVersion }}</span>
+                <span class="badge bg-primary fs-6">{{ r.version }}</span>
             <div class="p-2 border rounded">
                     <div class="small text-muted fw-bold">Build Date</div>
-                    <div>{{ PLACEHOLDER }}%</div>
-                </div>    
+                    <div>{{ r.buildDate }}%</div>
+                </div>
+                {% endfor %}
             </div>
 
             {% if current_user.is_admin and stats %}
