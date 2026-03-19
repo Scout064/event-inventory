@@ -53,6 +53,7 @@ fi
 # 5. Pull latest code from GitHub
 echo "Pulling latest code..."
 cd "$APP_DIR" || { echo "Failed to cd to $APP_DIR"; exit 1; }
+git stash
 git fetch origin
 git checkout "$BRANCH"
 git pull origin "$BRANCH"
