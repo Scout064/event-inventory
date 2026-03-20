@@ -11,7 +11,8 @@ VERSION_PATH = os.path.join(APP_DIR, "version.json")
 
 # 1-Hour TTL Cache to prevent GitHub API rate limiting
 _github_cache = {"releases": None, "timestamp": 0}
-CACHE_TTL = 3600 
+CACHE_TTL = 3600
+
 
 def get_github_releases():
     if time.time() - _github_cache["timestamp"] < CACHE_TTL and _github_cache["releases"] is not None:
@@ -87,20 +88,16 @@ def get_version_status():
         "update_available": False,
         "latest_stable": None
     }
-    
     try:
         stable_releases = get_stable_releases(limit=1)
         if stable_releases:
             latest_stable_str = stable_releases[0]["version"]
             status["latest_stable"] = latest_stable_str
-            
             # Use packaging.version to accurately compare semantic versions (e.g. 1.2.0 > 1.2.0-alpha)
             curr_v = version.parse(current_str)
             latest_v = version.parse(latest_stable_str)
-            
             if latest_v > curr_v:
                 status["update_available"] = True
     except Exception as e:
-        print(f"Error checking version status: {e}")
-        
+        print(f"Error checking version status: {e}")    
     return status
