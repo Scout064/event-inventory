@@ -14,7 +14,6 @@ _github_cache = {"releases": None, "timestamp": 0}
 CACHE_TTL = 3600 
 
 def get_github_releases():
-    global _github_cache
     if time.time() - _github_cache["timestamp"] < CACHE_TTL and _github_cache["releases"] is not None:
         return _github_cache["releases"]
 
