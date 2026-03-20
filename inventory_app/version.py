@@ -99,5 +99,5 @@ def get_version_status():
             if latest_v > curr_v:
                 status["update_available"] = True
     except Exception as e:
-        print(f"Error checking version status: {e}")    
+        print(f"Error checking version status: {e}")
     return status
