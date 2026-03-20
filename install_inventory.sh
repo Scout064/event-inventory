@@ -194,6 +194,40 @@ a2ensite inventory.conf
 a2dissite 000-default.conf || true
 systemctl restart apache2
 
+# ---------------------------------------------------------
+# Configure Sudoers for Web UI Updates
+# ---------------------------------------------------------
+echo "--- Configuring sudoers for automated updates ---"
+
+# Find the absolute path to systemctl
+SYSTEMCTL_PATH=$(which systemctl)
+SUDOERS_FILE="/etc/sudoers.d/inventory-update"
+
+# Create the drop-in file allowing www-data to restart the web service
+# NOTE: Because this install script uses Apache, the service is 'apache2'
+echo "www-data ALL=(root) NOPASSWD: ${SYSTEMCTL_PATH} restart apache2" > "$SUDOERS_FILE"
+
+# Set strict permissions required by sudo
+chmod 0440 "$SUDOERS_FILE"
+
+# Safely validate the syntax of the new file
+if visudo -cf "$SUDOERS_FILE" >/dev/null 2>&1; then
+    echo "✅ Sudoers rule added successfully."
+else
+    echo "❌ ERROR: Sudoers syntax invalid. Removing file for safety."
+    rm -f "$SUDOERS_FILE"
+fi
+
+# ---------------------------------------------------------
+# Set up Web Update Log
+# ---------------------------------------------------------
+echo "--- Configuring Web Update Log ---"
+UPDATE_LOG="/var/log/apache2/inventory_webupdate.log"
+touch "$UPDATE_LOG"
+# Give the web user ownership so the update script can write to it
+chown www-data:adm "$UPDATE_LOG"
+chmod 664 "$UPDATE_LOG"
+
 echo "========================================================="
 echo "✅ Installation complete!"
 echo "URL: http://$SERVER_NAME"
