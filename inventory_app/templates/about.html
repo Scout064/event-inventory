@@ -19,6 +19,12 @@
                     Current Version
                 </span>
                 <span class="badge bg-primary fs-6">{{ currentVersion }}</span>
+                
+                {% if buildDate and buildDate != "Unknown" %}
+                <div class="small text-muted mt-2 fw-bold">
+                    Build Date: <span class="fw-normal">{{ buildDate }}</span>
+                </div>
+                {% endif %}
             </div>
 
             {% if current_user.is_admin and stats %}
