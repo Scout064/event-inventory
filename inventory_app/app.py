@@ -29,7 +29,8 @@ from inventory_app.forms import (
 )
 from inventory_app.reports import create_label_image, create_items_pdf, create_production_pdf
 from inventory_app.version import (
-    get_current_version, get_beta_releases, get_stable_releases, get_build_date
+    get_current_version, get_beta_releases, get_stable_releases, get_build_date,
+    get_version_status
 )
 from inventory_app.security import User, admin_required
 from inventory_app.utils import save_logo
@@ -90,7 +91,8 @@ def inject_site_branding():
             pass
         finally:
             conn.close()
-    return dict(site_cfg=site_cfg)
+    v_status = get_version_status()
+    return dict(site_cfg=site_cfg, version_info=v_status)
 
 
 # --- Routes --- #
