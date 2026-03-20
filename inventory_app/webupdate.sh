@@ -53,6 +53,14 @@ fi
 # 5. Pull latest code from GitHub
 echo "Pulling latest code..."
 cd "$APP_DIR" || { echo "Failed to cd to $APP_DIR"; exit 1; }
+REPO_URL="https://github.com/Scout064/event-inventory.git"
+CURRENT_URL=$(git remote get-url origin 2>/dev/null)
+if [ "$CURRENT_URL" != "$REPO_URL" ]; then
+  echo "Setting remote URL..."
+  git remote set-url origin "$REPO_URL"
+else
+  echo "Remote URL already set. Skipping..."
+fi
 git stash
 git fetch origin
 git checkout "$BRANCH"
