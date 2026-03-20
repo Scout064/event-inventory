@@ -746,12 +746,14 @@ def profile():
 def about():
     version_path = os.path.join(APP_DIR, "version.json")
     version_string = "v0.0.0 (Unknown)"
+    build_date_string = "Unknown"
     stable_releases = []
     beta_releases = []
     stats = None
     if os.path.exists(version_path):
         try:
             version_string = get_current_version()
+            build_date_string = get_build_date()
             stable_releases = get_stable_releases()
             beta_releases = get_beta_releases(limit=5)
         except Exception as e:
@@ -786,6 +788,7 @@ def about():
     return render_template(
         "about.html",
         currentVersion=version_string,
+        buildDate=build_date_string,
         releases=stable_releases,
         beta=beta_releases,
         stats=stats
