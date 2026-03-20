@@ -28,7 +28,9 @@ from inventory_app.forms import (
     SetupForm, LoginForm, ItemForm, ProductionForm, UserAdminForm, UserProfileForm
 )
 from inventory_app.reports import create_label_image, create_items_pdf, create_production_pdf
-from inventory_app.version import get_current_version, get_beta_releases, get_stable_releases
+from inventory_app.version import (
+    get_current_version, get_beta_releases, get_stable_releases, get_build_date
+)
 from inventory_app.security import User, admin_required
 from inventory_app.utils import save_logo
 
