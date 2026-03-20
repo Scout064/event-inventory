@@ -16,6 +16,28 @@
       {% endif %}
       <span>{{ site_cfg.site_name or 'Inventory' }}</span>
     </a>
+
+    {% if version_info %}
+    {% if version_info.is_alpha %}
+        <span class="badge bg-danger ms-2 me-2" title="Alpha Version">Alpha</span>
+    {% elif version_info.is_beta %}
+        <span class="badge bg-warning text-dark ms-2 me-2" title="Beta Version">Beta</span>
+    {% endif %}
+
+    {% if version_info.update_available %}
+        <a href="{{ url_for('about') }}" class="btn btn-sm btn-success rounded-pill shadow-sm" style="animation: pulse 2s infinite;">
+            <i class="bi bi-cloud-arrow-down-fill"></i> Update Available ({{ version_info.latest_stable }})
+        </a>
+        
+        <style>
+            @keyframes pulse {
+                0% { box-shadow: 0 0 0 0 rgba(25, 135, 84, 0.7); }
+                70% { box-shadow: 0 0 0 6px rgba(25, 135, 84, 0); }
+                100% { box-shadow: 0 0 0 0 rgba(25, 135, 84, 0); }
+            }
+        </style>
+    {% endif %}
+{% endif %}
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
       <span class="navbar-toggler-icon"></span>
