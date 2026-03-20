@@ -57,3 +57,19 @@ def get_current_version():
     with open(VERSION_PATH, "r", encoding="utf-8") as f:
         data = json.load(f)
     return data["version"]
+
+
+def get_build_date():
+    try:
+        with open(VERSION_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        date_str = data.get("buildDate", "Unknown")
+        # Optional: Make the ISO date look nicer (e.g., "2026-03-15 20:00")
+        if date_str != "Unknown":
+            from datetime import datetime
+            # Python 3.7+ can parse standard ISO 8601 strings natively
+            dt = datetime.fromisoformat(date_str)
+            return dt.strftime("%B %d, %Y at %H:%M")
+        return date_str
+    except Exception:
+        return "Unknown"
