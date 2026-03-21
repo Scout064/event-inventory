@@ -2,11 +2,12 @@
 # File: webupdate.sh
 # Usage: ./webupdate.sh [branch_name]
 
-# 1. Set up Logging
+# 1. Set up Logging and absolute path
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 LOG_FILE="/var/log/apache2/inventory_webupdate.log"
 # This line pipes all subsequent stdout and stderr to tee, 
 # appending to the log file while still printing to the screen/frontend.
-exec > >(tee -a "$LOG_FILE") 2>&1
+exec > >(/usr/bin/tee -a "$LOG_FILE") 2>&1
 
 echo "============================================================"
 echo "--- Starting Automated Deployment at $(date) ---"
