@@ -72,18 +72,46 @@ if [ -f "$APP_DIR/inventory_app/requirements.txt" ]; then
     $VENV_PIP install -r "$APP_DIR/inventory_app/requirements.txt"
 fi
 
-# 7. Apply Schema
-echo "Applying base schema to database..."
+# 7. Apply Schema & Migrations
+echo "Applying base schema and checking migrations..."
 mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$APP_DIR/inventory_app/schema.sql"
+# Get current DB version
+CURRENT_VER=$(mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" -N -s -e "SELECT MAX(version) FROM schema_version;")
+if [ -z "$CURRENT_VER" ] || [ "$CURRENT_VER" = "NULL" ]; then
+    CURRENT_VER=1
+fi
+# Extract latest version from migrations.sql
+LATEST_VER=$(grep -Eo '^-- VERSION [0-9]+' "$APP_DIR/inventory_app/migrations.sql" | awk '{print $3}' | sort -n | tail -1)
+if [ -z "$LATEST_VER" ]; then
+    echo "ERROR: Could not determine latest migration version"
+    exit 1
+fi
+echo "Current DB version: $CURRENT_VER"
+echo "Latest migration version: $LATEST_VER"
+# Compare versions
+if [ "$CURRENT_VER" -lt "$LATEST_VER" ]; then
+    echo "Upgrading Database to Version $LATEST_VER..."
+    mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$APP_DIR/inventory_app/migrations.sql"
+    mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" \
+        -e "DELETE FROM schema_version WHERE version < $LATEST_VER;"
+else
+    echo "Database already up to date."
+fi
 
 # 8. Restart Web Service
 echo "Restarting application..."
 touch "$APP_DIR/wsgi.py"
-sudo /usr/bin/systemctl restart apache2
-
-echo "--- Deployment Complete ---"
-echo "You can find the output of this run under:"
-echo "/var/log/apache2/inventory_webupdate.log"
-echo "sudo cat /var/log/apache2/inventory_webupdate.log"
-
-sleep 15
+sudo /usr/bin/systemctl restart inventory
+sleep 5
+if systemctl is-active --quiet inventory; then
+    echo "--- Deployment Complete ---"
+    echo "You can find the output of this run under:"
+    echo "/var/log/apache2/inventory_webupdate.log"
+    echo "sudo cat /var/log/apache2/inventory_webupdate.log"
+    echo "Gunicorn Logs: sudo journalctl -u inventory -f"
+    sleep 15
+else
+    echo "Deployment FAILED: Check logs with 'sudo journalctl -u inventory -f'"
+    sleep 15
+    exit 1
+fi
