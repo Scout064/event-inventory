@@ -72,19 +72,32 @@ fi
 # 6. Apply Schema & Migrations
 echo "Applying base schema and checking migrations..."
 mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$APP_DIR/inventory_app/schema.sql"
-
+# Get current DB version
 CURRENT_VER=$(mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" -N -s -e "SELECT MAX(version) FROM schema_version;")
-[ -z "$CURRENT_VER" ] || [ "$CURRENT_VER" == "NULL" ] && CURRENT_VER=1
-
-if [ "$CURRENT_VER" -lt 2 ]; then
-    echo "Upgrading Database to Version 2..."
+if [ -z "$CURRENT_VER" ] || [ "$CURRENT_VER" = "NULL" ]; then
+    CURRENT_VER=1
+fi
+# Extract latest version from migrations.sql
+LATEST_VER=$(grep -Eo '^-- VERSION [0-9]+' "$APP_DIR/inventory_app/migrations.sql" | awk '{print $3}' | sort -n | tail -1)
+if [ -z "$LATEST_VER" ]; then
+    echo "ERROR: Could not determine latest migration version"
+    exit 1
+fi
+echo "Current DB version: $CURRENT_VER"
+echo "Latest migration version: $LATEST_VER"
+# Compare versions
+if [ "$CURRENT_VER" -lt "$LATEST_VER" ]; then
+    echo "Upgrading Database to Version $LATEST_VER..."
     mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$APP_DIR/inventory_app/migrations.sql"
-    mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "DELETE FROM schema_version WHERE version < 2;"
+    mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" \
+        -e "DELETE FROM schema_version WHERE version < $LATEST_VER;"
+else
+    echo "Database already up to date."
 fi
 
 # 7. Reload
 echo "Restarting application and Apache..."
 touch "$APP_DIR/wsgi.py"
-systemctl restart apache2
+systemctl restart inventory
 
 echo "--- Deployment Finished Successfully. ---"
