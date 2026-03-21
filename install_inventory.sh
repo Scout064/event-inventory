@@ -128,8 +128,9 @@ if [[ "$USE_REVERSE_PROXY" =~ ^[Yy]$ ]]; then
     ErrorLog \${APACHE_LOG_DIR}/inventory_error.log
     CustomLog \${APACHE_LOG_DIR}/inventory_access.log combined
 
-    WSGIDaemonProcess inventory_app python-home=$APP_DIR/inventory_app/venv python-path=$APP_DIR/inventory_app
-    WSGIScriptAlias / $APP_DIR/wsgi.py
+    ProxyPreserveHost On
+    ProxyPass / http://127.0.0.1:8000/
+    ProxyPassReverse / http://127.0.0.1:8000/
     <Directory $APP_DIR>
         Require all granted
     </Directory>
@@ -159,8 +160,9 @@ else
     RewriteRule ^/(.*)$ https://%{HTTP_HOST}/\$1 [R=301,L]
 
     DocumentRoot $APP_DIR
-    WSGIDaemonProcess inventory_app_http python-home=$APP_DIR/inventory_app/venv python-path=$APP_DIR/inventory_app
-    WSGIScriptAlias / $APP_DIR/wsgi.py
+    ProxyPreserveHost On
+    ProxyPass / http://127.0.0.1:8000/
+    ProxyPassReverse / http://127.0.0.1:8000/
     <Directory $APP_DIR>
         Require all granted
     </Directory>
@@ -176,8 +178,9 @@ else
     SSLCertificateFile $CERT_FILE
     SSLCertificateKeyFile $KEY_FILE
 
-    WSGIDaemonProcess inventory_app_https python-home=$APP_DIR/inventory_app/venv python-path=$APP_DIR/inventory_app
-    WSGIScriptAlias / $APP_DIR/wsgi.py
+    ProxyPreserveHost On
+    ProxyPass / http://127.0.0.1:8000/
+    ProxyPassReverse / http://127.0.0.1:8000/
 
     <Directory $APP_DIR>
         Require all granted
@@ -228,8 +231,36 @@ touch "$UPDATE_LOG"
 chown www-data:adm "$UPDATE_LOG"
 chmod 664 "$UPDATE_LOG"
 
+# ---------------------------------------------------------
+# Set up systemd service
+# ---------------------------------------------------------
+echo "--- Setting up systemd Service ---"
+SERVICE_CONF="/etc/systemd/system/inventory.service"
+tee "$SERVICE_CONF" > /dev/null <<EOF
+[Unit]
+Description=Gunicorn instance to serve the Inventory App
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/inventory
+Environment="PATH=/var/www/inventory/inventory_app/venv/bin"
+# 3 workers is usually a good starting point for a small/medium app
+ExecStart=/var/www/inventory/inventory_app/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 wsgi:application
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+echo "--- enabling service ---"
+systemctl daemon-reload
+systemctl start inventory
+systemctl enable inventory
+
 echo "========================================================="
 echo "✅ Installation complete!"
 echo "URL: http://$SERVER_NAME"
 echo "Log Location: /var/log/apache2/inventory_error.log"
+echo "Gunicorn Logs: sudo journalctl -u inventory -f"
 echo "========================================================="
