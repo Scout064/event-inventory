@@ -65,11 +65,10 @@ This will:
 * Install MariaDB client libraries
 * Create a virtual environment
 * Install all Python dependencies
-
-move the contents of `inventory_app` to `/var/www/inventory` 
+* move all files and set permissions
 
 Access via:
-`http://127.0.0.1:8000` / `http://server-ip:8000` to complete the initial configuration.
+`http://127.0.0.1` / `http://server-ip` to complete the initial configuration.
 
 ---
 
