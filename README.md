@@ -8,7 +8,7 @@
 
 # 🎛 Inventory Management System for Event Technicians
 
-A **web-based inventory management system** built with **Python (Flask)**, **MariaDB**, and **Apache2**.
+A **web-based inventory management system** built with **Python (Flask)**, **MariaDB**, and **Gunicorn** behind **Apache2**.
 Designed for **event technicians** to manage equipment, productions, and generate reports with QR code labels.
 
 ---
@@ -68,44 +68,6 @@ This will:
 
 move the contents of `inventory_app` to `/var/www/inventory` 
 
-### 3. Configure Apache2 (Production)
-
-Use the provided `apache-inventory.conf` as a template for your VirtualHost:
-
-```apache
-<VirtualHost *:443>
-    ServerName yourdomain.com
-    DocumentRoot /var/www/inventory
-    WSGIScriptAlias / /var/www/inventory/wsgi.py
-
-    <Directory /var/www/inventory>
-        Require all granted
-    </Directory>
-
-    SSLEngine on
-    SSLCertificateFile /etc/ssl/certs/your-cert.pem
-    SSLCertificateKeyFile /etc/ssl/private/your-key.pem
-</VirtualHost>
-```
-after, enable the Site:
-```
-a2enmod rewrite
-a2enmod ssl
-a2enmod wsgi
-a2ensite apache-inventory.conf
-systemctl reload apache2
-```
-
-### 4. Development Mode
-
-```bash
-cd /var/www/inventory
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python app.py
-```
-
 Access via:
 `http://127.0.0.1:8000` / `http://server-ip:8000` to complete the initial configuration.
 
@@ -132,12 +94,6 @@ lp -d DYMO_LabelWriter_450 label.pdf
 
 ## 📄 License
 
-This software is **proprietary**.
-See [LICENSE.txt](license.txt) for details.
+LGPL-2.1 license
 
 ---
-
-## 📬 Contact
-
-**Mössner – IT und Audio**
-[info@moessner-audio.de](mailto:info@moessner-audio.de)
