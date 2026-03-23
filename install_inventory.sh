@@ -208,7 +208,7 @@ SUDOERS_FILE="/etc/sudoers.d/inventory-update"
 
 # Create the drop-in file allowing www-data to restart the web service
 # NOTE: Because this install script uses Apache, the service is 'apache2'
-echo "www-data ALL=(root) NOPASSWD: ${SYSTEMCTL_PATH} restart apache2" > "$SUDOERS_FILE"
+echo "www-data ALL=(root) NOPASSWD: ${SYSTEMCTL_PATH} restart inventory" > "$SUDOERS_FILE"
 
 # Set strict permissions required by sudo
 chmod 0440 "$SUDOERS_FILE"
@@ -225,7 +225,7 @@ fi
 # Set up Web Update Log
 # ---------------------------------------------------------
 echo "--- Configuring Web Update Log ---"
-UPDATE_LOG="/var/log/apache2/inventory_webupdate.log"
+UPDATE_LOG="/var/www/inventory/inventory_webupdate.log"
 touch "$UPDATE_LOG"
 # Give the web user ownership so the update script can write to it
 chown www-data:adm "$UPDATE_LOG"
