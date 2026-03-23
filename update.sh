@@ -51,8 +51,8 @@ if jq -e '.db_pass != null and .encryption_key != null' "$CONFIG_FILE" > /dev/nu
     ENC_KEY=$(jq -r '.encryption_key' "$CONFIG_FILE")
 
     [[ -f "$SECRET_ENV" && -n "$(tail -c 1 "$SECRET_ENV" 2>/dev/null)" ]] && echo "" >> "$SECRET_ENV"
-    echo "DB_PASS=\"$DB_PASS\"" >> "$SECRET_ENV"
-    echo "ENCRYPTION_KEY=\"$ENC_KEY\"" >> "$SECRET_ENV"
+    echo "DB_PASS=\'$DB_PASS\'" >> "$SECRET_ENV"
+    echo "ENCRYPTION_KEY=\'$ENC_KEY\'" >> "$SECRET_ENV"
 
     # 2. Delete the keys from config.json
     # del() takes multiple keys separated by commas
