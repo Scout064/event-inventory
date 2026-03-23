@@ -32,7 +32,7 @@ if [ ! -f "$SECRET_ENV" ]; then
     echo "Preparing .env..."
     tee "$SECRET_ENV" > /dev/null <<EOF
     # ------ ENV FILE FOR SECRETS ------ #
-    EOF
+EOF
 fi
 
 # move contents from the existing ".json"
