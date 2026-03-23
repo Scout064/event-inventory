@@ -18,16 +18,31 @@ APP_DIR="/var/www/inventory"
 CONFIG_FILE="$APP_DIR/inventory_app/config.json"
 VENV_PIP="$APP_DIR/inventory_app/venv/bin/pip"
 BACKUP_DIR="$APP_DIR/inventory_app/backups"
+VENV_PYTHON="$APP_DIR/inventory_app/venv/bin/python3"
 
 echo "Target Branch: $BRANCH"
 
-# 3. Extract DB Credentials
-echo "Preparing Database for the update..."
-echo "Reading database credentials..."
-DB_HOST=$(python3 -c "import json; print(json.load(open('$CONFIG_FILE')).get('db_host', 'localhost'))")
+# 3. Extract DB credentials safely using Python!
+echo "Reading database configuration..."
+
+# We use Python's dotenv library to read the password safely. 
+# This prevents Bash from trying to interpret '$' inside double quotes.
 DB_USER=$(python3 -c "import json; print(json.load(open('$CONFIG_FILE')).get('db_user', ''))")
-DB_PASS=$(python3 -c "import json; print(json.load(open('$CONFIG_FILE')).get('db_pass', ''))")
 DB_NAME=$(python3 -c "import json; print(json.load(open('$CONFIG_FILE')).get('db_name', ''))")
+DB_HOST=$(python3 -c "import json; print(json.load(open('$CONFIG_FILE')).get('db_host', '127.0.0.1'))")
+
+# Read from .env safely
+DB_PASS=$($VENV_PYTHON -c "
+import os
+from dotenv import load_dotenv
+load_dotenv('$SECRET_ENV')
+print(os.getenv('DB_PASS', ''))
+")
+
+if [ -z "$DB_PASS" ]; then
+    echo "CRITICAL ERROR: Could not read DB_PASS from .env"
+    exit 1
+fi
 
 # 4. Database Backup & Retention
 echo "Setting permissions and creating backup..."
