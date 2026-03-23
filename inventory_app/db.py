@@ -26,7 +26,7 @@ def get_db():
     try:
         conn = mariadb.connect(
             user=cfg["db_user"],
-            password=cfg["db_pass"],
+            password=os.environ.get("DB_PASS"),
             host=cfg["db_host"],
             port=int(cfg.get("db_port", 3306)),
             database=cfg["db_name"],
