@@ -16,6 +16,7 @@ APP_DIR="/var/www/inventory"
 CONFIG_FILE="$APP_DIR/inventory_app/config.json"
 VENV_PIP="$APP_DIR/inventory_app/venv/bin/pip"
 BACKUP_DIR="$APP_DIR/inventory_app/backups"
+VENV_PYTHON="$APP_DIR/inventory_app/venv/bin/python3"
 
 echo "--- Starting Automated Deployment ---"
 
@@ -113,10 +114,31 @@ chmod 750 "$BACKUP_DIR"
 
 # 4. Extract DB credentials
 echo "Reading database configuration..."
-DB_USER=$(python3 -c "import json; print(json.load(open('$CONFIG_FILE'))['db_user'])")
-DB_PASS=$(python3 -c "import json; print(json.load(open('$CONFIG_FILE'))['db_pass'])")
-DB_NAME=$(python3 -c "import json; print(json.load(open('$CONFIG_FILE'))['db_name'])")
-DB_HOST=$(python3 -c "import json; print(json.load(open('$CONFIG_FILE'))['db_host'])")
+
+# Check if env exists, if not, abort
+if [ ! -f "$SECRET_ENV" ]; then
+    echo "ERROR: .env file not found at $SECRET_ENV. Cannot proceed!"
+    exit 1
+fi
+
+# We use Python's dotenv library to read the password safely. 
+# This prevents Bash from trying to interpret '$' inside double quotes.
+DB_USER=$(python3 -c "import json; print(json.load(open('$CONFIG_FILE')).get('db_user', ''))")
+DB_NAME=$(python3 -c "import json; print(json.load(open('$CONFIG_FILE')).get('db_name', ''))")
+DB_HOST=$(python3 -c "import json; print(json.load(open('$CONFIG_FILE')).get('db_host', '127.0.0.1'))")
+
+# Read from .env safely
+DB_PASS=$($VENV_PYTHON -c "
+import os
+from dotenv import load_dotenv
+load_dotenv('$SECRET_ENV')
+print(os.getenv('DB_PASS', ''))
+")
+
+if [ -z "$DB_PASS" ]; then
+    echo "CRITICAL ERROR: Could not read DB_PASS from .env"
+    exit 1
+fi
 
 # 5. Database Backup & Retention (Keep last 2)
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
