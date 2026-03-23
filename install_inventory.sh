@@ -108,6 +108,13 @@ cd "$APP_DIR/inventory_app"
 python3 -m venv venv
 ./venv/bin/pip install -r requirements.txt
 
+# Prepare .env file for secrets
+SECRET_ENV="$APP_DIR/inventory_app/.env"
+echo "Preparing .env..."
+tee "$SECRET_ENV" > /dev/null <<EOF
+# ------ ENV FILE FOR SECRETS ------ #
+EOF
+
 # Apply Schema & Migrations
 echo "Applying base schema and checking migrations..."
 mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$APP_DIR/inventory_app/schema.sql"
