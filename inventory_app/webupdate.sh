@@ -18,6 +18,7 @@ APP_DIR="/var/www/inventory"
 CONFIG_FILE="$APP_DIR/inventory_app/config.json"
 VENV_PIP="$APP_DIR/inventory_app/venv/bin/pip"
 BACKUP_DIR="$APP_DIR/inventory_app/backups"
+VENV_PYTHON="$APP_DIR/inventory_app/venv/bin/python3"
 
 echo "Target Branch: $BRANCH"
 
