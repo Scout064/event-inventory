@@ -69,6 +69,28 @@ else
     echo "Migration skipped: 'db_pass' or 'encryption_key' not found in $CONFIG_FILE."
 fi
 
+# --- Update Systemd Service ---
+SERVICE_FILE="/etc/systemd/system/inventory.service"
+ENV_LINE="EnvironmentFile=/var/www/inventory/.env"
+
+# Check if the service file exists before trying to modify it
+if [ -f "$SERVICE_FILE" ]; then
+    # Check if the EnvironmentFile line is already in the service file
+    if grep -qF "$ENV_LINE" "$SERVICE_FILE"; then
+        echo "Systemd service already configured with EnvironmentFile."
+    else
+        echo "Adding EnvironmentFile to systemd service..."
+        # Use sed to append the line immediately after the [Service] tag
+        sed -i '/^\[Service\]/a '"$ENV_LINE" "$SERVICE_FILE"
+        
+        # Reload systemd so it registers the change to the file
+        systemctl daemon-reload
+        echo "Systemd daemon reloaded."
+    fi
+else
+    echo "Warning: Service file $SERVICE_FILE not found!"
+fi
+
 # 1. Safely copy new App Code
 echo "Copying new files from $SRC_DIR to $APP_DIR..."
 rsync -av \
