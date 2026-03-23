@@ -49,7 +49,8 @@ if jq -e '.db_pass != null and .encryption_key != null' "$CONFIG_FILE" > /dev/nu
     DB_PASS=$(jq -r '.db_pass' "$CONFIG_FILE")
     ENC_KEY=$(jq -r '.encryption_key' "$CONFIG_FILE")
 
-    echo "DB_PASS=\"$DB_PASS\"" > "$SECRET_ENV"
+    [[ -f "$SECRET_ENV" && -n "$(tail -c 1 "$SECRET_ENV" 2>/dev/null)" ]] && echo "" >> "$SECRET_ENV"
+    echo "DB_PASS=\"$DB_PASS\"" >> "$SECRET_ENV"
     echo "ENCRYPTION_KEY=\"$ENC_KEY\"" >> "$SECRET_ENV"
 
     # 2. Delete the keys from config.json
@@ -59,6 +60,10 @@ if jq -e '.db_pass != null and .encryption_key != null' "$CONFIG_FILE" > /dev/nu
     # 3. Replace the original file with the cleaned version
     mv "$TEMP_FILE" "$CONFIG_FILE"
 
+    # 4. Set secure permissions on .env (Owner read/write only)
+    chown www-data:www-data "$SECRET_ENV"
+    chmod 600 "$SECRET_ENV"
+    
     echo "Success: Credentials moved to $SECRET_ENV and scrubbed from $CONFIG_FILE."
 else
     echo "Migration skipped: 'db_pass' or 'encryption_key' not found in $CONFIG_FILE."
