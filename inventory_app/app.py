@@ -7,6 +7,9 @@ import subprocess
 import json
 from datetime import datetime
 from flask import Response
+from dotenv import load_dotenv
+# .env-Datei laden, um Variablen in os.environ verfügbar zu machen
+load_dotenv() 
 
 import mariadb
 from flask import (
