@@ -21,13 +21,58 @@ BACKUP_DIR="$APP_DIR/inventory_app/backups"
 
 echo "Target Branch: $BRANCH"
 
+# 2.1 prepare switch to .env if not already done
+# Check if .env exists, if not create it
+# Prepare .env file for secrets
+SECRET_ENV="$APP_DIR/inventory_app/.env"
+if [ ! -f "$SECRET_ENV" ]; then
+    echo "Preparing .env..."
+    tee "$SECRET_ENV" > /dev/null <<EOF
+    # ------ ENV FILE FOR SECRETS ------ #
+    EOF
+fi
+
+# move contents from the existing ".json"
+CONFIG_FILE="$APP_DIR/inventory_app/config.json"
+TEMP_FILE="$APP_DIR/inventory_app/config.tmp.json"
+
+# Check if the keys exist in the JSON file
+# .db_pass != null and .encryption_key != null ensures both are present
+if jq -e '.db_pass != null and .encryption_key != null' "$CONFIG_FILE" > /dev/null; then
+    echo "Secrets detected. Starting migration..."
+
+    # 1. Extract values to .env
+    # We do this first so we don't lose the data!
+    DB_PASS=$(jq -r '.db_pass' "$CONFIG_FILE")
+    ENC_KEY=$(jq -r '.encryption_key' "$CONFIG_FILE")
+
+    [[ -f "$SECRET_ENV" && -n "$(tail -c 1 "$SECRET_ENV" 2>/dev/null)" ]] && echo "" >> "$SECRET_ENV"
+    echo "DB_PASS=\"$DB_PASS\"" >> "$SECRET_ENV"
+    echo "ENCRYPTION_KEY=\"$ENC_KEY\"" >> "$SECRET_ENV"
+
+    # 2. Delete the keys from config.json
+    # del() takes multiple keys separated by commas
+    jq 'del(.db_pass, .encryption_key)' "$CONFIG_FILE" > "$TEMP_FILE"
+
+    # 3. Replace the original file with the cleaned version
+    mv "$TEMP_FILE" "$CONFIG_FILE"
+
+    # 4. Set secure permissions on .env (Owner read/write only)
+    chown www-data:www-data "$SECRET_ENV"
+    chmod 600 "$SECRET_ENV"
+    
+    echo "Success: Credentials moved to $SECRET_ENV and scrubbed from $CONFIG_FILE."
+else
+    echo "Migration skipped: 'db_pass' or 'encryption_key' not found in $CONFIG_FILE."
+fi
+
 # 3. Extract DB Credentials
 echo "Preparing Database for the update..."
 echo "Reading database credentials..."
 DB_HOST=$(python3 -c "import json; print(json.load(open('$CONFIG_FILE')).get('db_host', 'localhost'))")
 DB_USER=$(python3 -c "import json; print(json.load(open('$CONFIG_FILE')).get('db_user', ''))")
-DB_PASS=$(python3 -c "import json; print(json.load(open('$CONFIG_FILE')).get('db_pass', ''))")
 DB_NAME=$(python3 -c "import json; print(json.load(open('$CONFIG_FILE')).get('db_name', ''))")
+DB_PASS=$(grep '^DB_PASS=' "$SECRET_ENV" | cut -d '=' -f2- | sed 's/^"//;s/"$//')
 
 # 4. Database Backup & Retention
 echo "Setting permissions and creating backup..."
