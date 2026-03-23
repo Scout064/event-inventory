@@ -8,9 +8,6 @@ import json
 from datetime import datetime
 from flask import Response
 from dotenv import load_dotenv
-# .env-Datei laden, um Variablen in os.environ verfügbar zu machen
-load_dotenv() 
-
 import mariadb
 from flask import (
     Flask, render_template, request, redirect, url_for, flash,
@@ -37,6 +34,9 @@ from inventory_app.version import (
 )
 from inventory_app.security import User, admin_required
 from inventory_app.utils import save_logo
+
+# .env-Datei laden, um Variablen in os.environ verfügbar zu machen
+load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-change-me")
