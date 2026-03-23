@@ -108,6 +108,45 @@ cd "$APP_DIR/inventory_app"
 python3 -m venv venv
 ./venv/bin/pip install -r requirements.txt
 
+# Prepare .env file for secrets
+SECRET_ENV="$APP_DIR/inventory_app/.env"
+echo "Preparing .env..."
+tee "$SECRET_ENV" > /dev/null <<EOF
+# ------ ENV FILE FOR SECRETS ------ #
+EOF
+
+# move contents from the existing ".json"
+CONFIG_FILE="$APP_DIR/inventory_app/config.json"
+TEMP_FILE="$APP_DIR/inventory_app/config.tmp.json"
+
+# Check if the keys exist in the JSON file
+# .db_pass != null ensures it is present
+if jq -e '.db_pass != null "$CONFIG_FILE" > /dev/null; then
+    echo "Secrets detected. Starting migration..."
+
+    # 1. Extract values to .env
+    # We do this first so we don't lose the data!
+    DB_PASS=$(jq -r '.db_pass' "$CONFIG_FILE")
+
+    [[ -f "$SECRET_ENV" && -n "$(tail -c 1 "$SECRET_ENV" 2>/dev/null)" ]] && echo "" >> "$SECRET_ENV"
+    echo "DB_PASS=\"$DB_PASS\"" >> "$SECRET_ENV"
+
+    # 2. Delete the keys from config.json
+    # del() takes multiple keys separated by commas
+    jq 'del(.db_pass)' "$CONFIG_FILE" > "$TEMP_FILE"
+
+    # 3. Replace the original file with the cleaned version
+    mv "$TEMP_FILE" "$CONFIG_FILE"
+
+    # 4. Set secure permissions on .env (Owner read/write only)
+    chown www-data:www-data "$SECRET_ENV"
+    chmod 600 "$SECRET_ENV"
+    
+    echo "Success: Credentials moved to $SECRET_ENV and scrubbed from $CONFIG_FILE."
+else
+    echo "Migration skipped: 'db_pass' or 'encryption_key' not found in $CONFIG_FILE."
+fi
+
 # Apply Schema & Migrations
 echo "Applying base schema and checking migrations..."
 mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$APP_DIR/inventory_app/schema.sql"
@@ -246,6 +285,7 @@ User=www-data
 Group=www-data
 WorkingDirectory=/var/www/inventory
 Environment="PATH=/var/www/inventory/inventory_app/venv/bin"
+EnvironmentFile=/var/www/inventory/.env
 # 3 workers is usually a good starting point for a small/medium app
 ExecStart=/var/www/inventory/inventory_app/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 wsgi:application
 
