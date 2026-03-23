@@ -285,6 +285,7 @@ User=www-data
 Group=www-data
 WorkingDirectory=/var/www/inventory
 Environment="PATH=/var/www/inventory/inventory_app/venv/bin"
+EnvironmentFile=/var/www/inventory/.env
 # 3 workers is usually a good starting point for a small/medium app
 ExecStart=/var/www/inventory/inventory_app/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 wsgi:application
 
