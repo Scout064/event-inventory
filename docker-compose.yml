@@ -1,11 +1,22 @@
 version: '3.8'
 
 services:
-  # --- 1. THE APP ---
+  # --- 1. THE DATABASE ---
+  db:
+    image: mariadb:11
+    container_name: mariaDB
+    restart: unless-stopped
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+    volumes:
+      - db_data:/var/lib/mysql
+  # --- 2. THE APP ---
   Event_Inventory:
     image: ghcr.io/scout064/event-inventory-licensed:latest
     container_name: inventory
     restart: unless-stopped
+    depends_on:
+      - db
     volumes:
       - ./inventory_app/config.json:/inventory_app/inventory_app/config.json
       - ./inventory_app/.env:/inventory_app/inventory_app/.env
@@ -19,7 +30,7 @@ services:
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
-  # --- 2. THE AUTOMATION ---
+  # --- 3. THE AUTOMATION ---
   # Option A: Automatic polling (checks every 24h)
   watchtower:
     image: containrrr/watchtower
@@ -62,15 +73,6 @@ services:
     ports:
       - "9000:9000"
 
-  # --- 3. THE DATABASE ---
-  db:
-    image: mariadb:11
-    container_name: mariaDB
-    restart: unless-stopped
-    environment:
-      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
-    volumes:
-      - db_data:/var/lib/mysql
 
 volumes:
   portainer-data:
