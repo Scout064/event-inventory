@@ -18,7 +18,19 @@ sudo mkdir -p "$TARGET_DIR/inventory_app"
 # Touch config files as root, then hand ownership to current user.
 # These must exist as FILES before docker compose up — if they don't exist,
 # Docker creates them as directories, which causes a confusing crash.
-sudo touch "$TARGET_DIR/inventory_app/config.json"
+# Write default config so the app can start before setup is complete
+sudo tee "$TARGET_DIR/inventory_app/config.json" > /dev/null << 'EOF'
+{
+  "configured": false,
+  "app_domain": "",
+  "db_host": "",
+  "db_port": "",
+  "db_name": "",
+  "db_user": "",
+  "logo_path": "",
+  "site_name": ""
+}
+EOF
 sudo touch "$TARGET_DIR/inventory_app/.env"
 
 sudo chown -R "$USER:$USER" "$TARGET_DIR"
