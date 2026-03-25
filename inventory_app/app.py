@@ -5,6 +5,7 @@ import csv
 import psutil
 import subprocess
 import json
+import requests
 from datetime import datetime
 from flask import Response
 from dotenv import load_dotenv
@@ -52,6 +53,9 @@ LAN_REGEX = re.compile(
     r"172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+)$"
 )
 
+# Conf Variables for Watchtower - Webupdate
+WATCHTOWER_URL = "http://watchtower:8080/v1/update"
+WATCHTOWER_TOKEN = os.environ.get("WATCHTOWER_TOKEN")
 
 @app.before_request
 def enforce_https():
