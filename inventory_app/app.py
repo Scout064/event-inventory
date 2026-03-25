@@ -37,8 +37,9 @@ from inventory_app.utils import save_logo
 from inventory_app.crypto import get_or_create_flask_secret
 
 # .env-Datei laden, um Variablen in os.environ verfügbar zu machen
-load_dotenv()
-DOTENV_PATH = os.path.join(os.path.dirname(APP_DIR), ".env")
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+DOTENV_PATH = os.path.join(APP_DIR, ".env")
+load_dotenv(DOTENV_PATH)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-change-me")
@@ -951,9 +952,13 @@ def create_app():
 @login_required
 @admin_required
 def trigger_update():
+    if not WATCHTOWER_TOKEN:
+        return Response(
+            "data: ERROR: WATCHTOWER_TOKEN not set in environment.\n\n",
+            mimetype="text/event-stream"
+        )
     version_path = os.path.join(APP_DIR, "version.json")
     branch = "main"  # Fallback branch
-
     if os.path.exists(version_path):
         try:
             with open(version_path, "r") as f:
@@ -961,36 +966,29 @@ def trigger_update():
                 branch = data.get("branch", "main")
         except Exception as e:
             print(f"WARNING: Could not get branch: {e}")
-            pass
-
     def generate_output():
-        yield f"data: Starting update process for branch: {branch}...\n\n"
-        script_path = os.path.join(APP_DIR, "webupdate.sh")
-
-        if not os.path.exists(script_path):
-            yield f"data: ERROR: Update script not found at {script_path}\n\n"
+        yield f"data: Initiating update sequence via Watchtower...\n\n"
+        yield f"data: Target image tag/branch: {branch}\n\n"
+        yield f"data: WARNING: If a new version is found, this server will abruptly restart and the connection will drop.\n\n"
+        headers = {
+            "Authorization": f"Bearer {WATCHTOWER_TOKEN}"
+        }
+        try:
+            # Send the request to Watchtower
+            # Note: If Watchtower updates THIS container, this process will be killed
+            # right here, and the code below will never execute.
+            response = requests.get(WATCHTOWER_URL, headers=headers)
+            if response.status_code == 200:
+                yield f"data: Watchtower finished checking. Log: {response.text}\n\n"
+                yield "data: DONE\n\n"
+            else:
+                yield f"data: ERROR: Watchtower returned status {response.status_code} - {response.text}\n\n"
+                yield "data: DONE\n\n"
+        except requests.exceptions.ConnectionError:
+            # If the request fails because the connection drops mid-flight
+            yield f"data: Connection lost! The system is restarting now.\n\n"
+            yield "data: RESTARTING\n\n"
+        except Exception as e:
+            yield f"data: ERROR: Failed to communicate with Watchtower: {str(e)}\n\n"
             yield "data: DONE\n\n"
-            return
-
-        # Run the bash script and capture stdout/stderr together
-        process = subprocess.Popen(
-            ["/bin/bash", script_path, branch],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True
-        )
-
-        # Stream output line-by-line to the frontend
-        for line in iter(process.stdout.readline, ''):
-            yield f"data: {line}\n\n"
-
-        process.stdout.close()
-        process.wait()
-        yield "data: DONE\n\n"
-
     return Response(generate_output(), mimetype='text/event-stream')
-
-
-application = create_app()
-if __name__ == "__main__":
-    application.run(host="0.0.0.0", port=8000, debug=False)
