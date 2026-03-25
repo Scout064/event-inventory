@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  # --- 1. THE APP ---
+  Event_Inventory:
+    image: ghcr.io/scout064/event-inventory-licensed:latest
+    container_name: inventory
+    restart: unless-stopped
+    volumes:
+      - ./inventory_app/config.json:/inventory_app/inventory_app/config.json
+      - ./inventory_app/.env:/inventory_app/inventory_app/.env
+      - backups:/inventory_app/backups
+    ports:
+      - "8000:8000"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # --- 2. THE AUTOMATION ---
+  # Option A: Automatic polling (checks every 24h)
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=86400
+      - WATCHTOWER_LABEL_ENABLE=true
+
+ # Option B: Manual trigger via HTTP API
+ # To use this instead, comment out Option A above and uncomment below.
+ # Make sure WATCHTOWER_HTTP_API_TOKEN matches WATCHTOWER_TOKEN in your Flask config.
+ #
+ # watchtower:
+ #   image: containrrr/watchtower
+ #   container_name: watchtower
+ #   restart: unless-stopped
+ #   volumes:
+ #     - /var/run/docker.sock:/var/run/docker.sock
+ #   environment:
+ #     - WATCHTOWER_CLEANUP=true
+ #     - WATCHTOWER_HTTP_API_UPDATE=true
+ #     - WATCHTOWER_HTTP_API_TOKEN=${WATCHTOWER_TOKEN}  # injected from .env at runtime
+ #     - WATCHTOWER_LABEL_ENABLE=true
+
+  # --- 3. THE WEB INTERFACE ---
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - portainer-data:/data
+    ports:
+      - "9000:9000"
+
+  # --- 3. THE DATABASE ---
+  db:
+    image: mariadb:11
+    container_name: mariaDB
+    restart: unless-stopped
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+    volumes:
+      - db_data:/var/lib/mysql
+
+volumes:
+  portainer-data:
+  backups:
+  db_data:
