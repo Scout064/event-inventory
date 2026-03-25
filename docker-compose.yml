@@ -10,6 +10,10 @@ services:
       - ./inventory_app/config.json:/inventory_app/inventory_app/config.json
       - ./inventory_app/.env:/inventory_app/inventory_app/.env
       - backups:/inventory_app/backups
+    environment:
+      # Injected from root .env at compose startup — never hardcoded.
+      # Flask reads this via os.environ.get("WATCHTOWER_TOKEN") in the update route.
+      - WATCHTOWER_TOKEN=${WATCHTOWER_TOKEN}
     ports:
       - "8000:8000"
     labels:
