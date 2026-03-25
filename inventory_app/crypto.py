@@ -5,12 +5,12 @@ from dotenv import load_dotenv, set_key
 # Pfad zur .env Datei definieren (ein Verzeichnis über inventory_app)
 DOTENV_PATH = os.path.join(APP_DIR, ".env")
 # Dev Secret to change
-OLD_DEV_SECRET = "dev-secret-change-me" 
+OLD_DEV_SECRET = "dev-secret-change-me"
 
 
 def get_or_create_flask_secret():
     """
-    Checks for a secure FLASK_SECRET_KEY. 
+    Checks for a secure FLASK_SECRET_KEY.
     If missing or matching the old dev secret, generates a new one.
     """
     # 1. Load existing variables
@@ -24,7 +24,7 @@ def get_or_create_flask_secret():
         # secrets module is cryptographically secure, better than os.urandom
         new_secret = secrets.token_hex(32)
         # 4. Save to the .env file permanently
-        # Note: python-dotenv will wrap this in double quotes, 
+        # Note: python-dotenv will wrap this in double quotes,
         # but since it's just hex (no $ symbols), it won't trigger the bash bug!
         set_key(DOTENV_PATH, "FLASK_SECRET_KEY", new_secret)
         # 5. Export to current running environment
