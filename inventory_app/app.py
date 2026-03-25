@@ -34,9 +34,11 @@ from inventory_app.version import (
 )
 from inventory_app.security import User, admin_required
 from inventory_app.utils import save_logo
+from inventory_app.crypto import get_or_create_flask_secret
 
 # .env-Datei laden, um Variablen in os.environ verfügbar zu machen
 load_dotenv()
+DOTENV_PATH = os.path.join(os.path.dirname(APP_DIR), ".env")
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-change-me")
@@ -933,6 +935,8 @@ def uploads(filename):
 
 def create_app():
     cfg = load_config()
+    # Set the key during app initialization
+    app.secret_key = get_or_create_flask_secret()
     if not cfg.get("configured"):
         print("WARNING: App not configured. Visit /setup to initialize.")
     else:
