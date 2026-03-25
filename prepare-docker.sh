@@ -22,13 +22,9 @@ sudo mkdir -p "$TARGET_DIR/inventory_app"
 sudo tee "$TARGET_DIR/inventory_app/config.json" > /dev/null << 'EOF'
 {
   "configured": false,
-  "app_domain": "",
   "db_host": "",
-  "db_port": "",
   "db_name": "",
-  "db_user": "",
-  "logo_path": "",
-  "site_name": ""
+  "db_user": ""
 }
 EOF
 sudo touch "$TARGET_DIR/inventory_app/.env"
