@@ -3,7 +3,15 @@
 <h3>Initial Setup</h3>
 <form method="post" enctype="multipart/form-data">
   {{ form.hidden_tag() }}
+  {% for field in form %}
+    {% for error in field.errors %}
+      <div class="alert alert-danger">{{ field.label.text }}: {{ error }}</div>
+    {% endfor %}
+  {% endfor %}
   <div class="row g-3">
+    <div class="mb-3">
+      <label class="form-label">App Domain</label>{{ form.app_domain(class="form-control", placeholder="e.g. inventory.example.com or localhost:8000") }}
+    </div>
     <div class="col-md-6">
       <label class="form-label">DB Host</label>{{ form.db_host(class="form-control") }}
     </div>

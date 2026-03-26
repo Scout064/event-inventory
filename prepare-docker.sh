@@ -36,7 +36,7 @@ chmod 775 "$TARGET_DIR"
 # Written to the ROOT .env ($TARGET_DIR/.env), not the app .env.
 #
 # Docker Compose reads $TARGET_DIR/.env automatically for ${VAR} substitution
-# in docker-compose.yml. The app-level secrets (DB_PASS, ENCRYPTION_KEY etc.)
+# in docker-compose.yml. The app-level secrets (DB_PASS etc.)
 # live separately in $TARGET_DIR/inventory_app/.env and are never exposed to
 # the compose layer.
 #
@@ -63,7 +63,7 @@ echo "--- Done ---"
 echo ""
 echo "File layout:"
 echo "  $ROOT_ENV          <- WATCHTOWER_TOKEN (read by Docker Compose)"
-echo "  $APP_ENV   <- DB_PASS, ENCRYPTION_KEY  (read by the app)"
+echo "  $APP_ENV   <- DB_PASS  (read by the app)"
 echo ""
 echo "Next steps:"
 echo "  1. Place docker-compose.yml in: $TARGET_DIR"

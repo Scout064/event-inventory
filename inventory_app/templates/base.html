@@ -38,6 +38,7 @@
         </style>
     {% endif %}
 {% endif %}
+
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
       <span class="navbar-toggler-icon"></span>
@@ -57,6 +58,7 @@
               <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="adminDropdown">
                 <li><a class="dropdown-item" href="{{ url_for('admin_settings') }}">Branding Settings</a></li>
                 <li><a class="dropdown-item" href="{{ url_for('admin_users') }}">Manage Users</a></li>
+
               </ul>
             </li>
           {% endif %}

@@ -40,3 +40,4 @@ def mock_db():
         mock_conn = MagicMock()
         mocked_get_db.return_value = mock_conn
         yield mock_conn
+

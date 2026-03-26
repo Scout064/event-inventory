@@ -6,13 +6,14 @@ import psutil
 import subprocess
 import json
 import requests
-from datetime import datetime
-from flask import Response
-from dotenv import load_dotenv
+import secrets
+from dotenv import load_dotenv, set_key
 import mariadb
+from datetime import datetime
 from flask import (
     Flask, render_template, request, redirect, url_for, flash,
-    send_file, abort, send_from_directory, jsonify
+    send_file, abort, send_from_directory, jsonify, g,
+    Response
 )
 from flask_login import (
     LoginManager, login_user, logout_user, current_user, login_required
@@ -53,9 +54,11 @@ LAN_REGEX = re.compile(
     r"172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+)$"
 )
 
+
 # Conf Variables for Watchtower - Webupdate
 WATCHTOWER_URL = "http://watchtower:8080/v1/update"
 WATCHTOWER_TOKEN = os.environ.get("WATCHTOWER_TOKEN")
+
 
 @app.before_request
 def enforce_https():
@@ -77,7 +80,7 @@ def enforce_https():
 @login_manager.user_loader
 def load_user(user_id):
     cfg = load_config()
-    if not cfg.get("configured"):
+    if not cfg.get("configured", False):
         return None
     row = find_user_by_id(user_id)
     if row:
@@ -110,7 +113,7 @@ def inject_site_branding():
 @app.route("/setup", methods=["GET", "POST"])
 def setup():
     cfg = load_config()
-    if cfg.get("configured"):
+    if cfg.get("configured", False):
         return redirect(url_for("index"))
     form = SetupForm()
     if form.validate_on_submit():
@@ -122,45 +125,142 @@ def setup():
             except ValueError:
                 flash("Logo must be PNG or JPEG.", "danger")
                 return render_template("setup.html", form=form, configured=False)
-        new_cfg = {
-            "configured": True,
-            "app_domain": form.app_domain.data.strip(),
-            "db_host": form.db_host.data.strip(),
-            "db_port": form.db_port.data.strip(),
-            "db_name": form.db_name.data.strip(),
-            "db_user": form.db_user.data.strip(),
-            "db_pass": form.db_pass.data,
-            "logo_path": logo_path,
-        }
+        db_host = form.db_host.data.strip()
+        db_port = int(form.db_port.data.strip())
+        db_name = form.db_name.data.strip()
+        db_user = form.db_user.data.strip()
+        db_password = form.db_pass.data
+        # ── 1. Connect as root (fresh MariaDB has no root password) ───────────
+        try:
+            root_conn = mariadb.connect(
+                user="root",
+                password="",
+                host=db_host,
+                port=db_port,
+            )
+        except mariadb.Error as ex:
+            flash(f"Could not connect to database as root: {ex}", "danger")
+            return render_template("setup.html", form=form, configured=False)
+        # ── 2. Create database and app user ───────────────────────────────────
+        try:
+            root_cur = root_conn.cursor()
+            root_cur.execute(f"CREATE DATABASE IF NOT EXISTS `{db_name}`")
+            root_cur.execute(
+                "CREATE USER IF NOT EXISTS %s@'%%' IDENTIFIED BY %s",
+                (db_user, db_password)
+            )
+            root_cur.execute(
+                f"GRANT ALL PRIVILEGES ON `{db_name}`.* TO %s@'%%'",
+                (db_user,)
+            )
+        except mariadb.Error as ex:
+            root_conn.close()
+            flash(f"Failed to create database or user: {ex}", "danger")
+            return render_template("setup.html", form=form, configured=False)
+        # ── 3. Verify app user can connect ────────────────────────────────────
         try:
             with mariadb.connect(
-                user=new_cfg["db_user"],
-                password=new_cfg["db_pass"],
-                host=new_cfg["db_host"],
-                port=int(new_cfg["db_port"]),
-                database=new_cfg["db_name"],
+                user=db_user,
+                password=db_password,
+                host=db_host,
+                port=db_port,
+                database=db_name,
             ):
                 pass
         except mariadb.Error as ex:
             flash(f"Database connection failed: {ex}", "danger")
             return render_template("setup.html", form=form, configured=False)
-        save_config(new_cfg)
+        # ── 4. Persist app user password to .env ──────────────────────────────
+        set_key(DOTENV_PATH, "DB_PASS", db_password)
+        os.environ["DB_PASS"] = db_password
+        # ── 5 Save config ────────────────────────────────────────────────────
+        new_cfg = {
+            "configured": True,
+            "app_domain": form.app_domain.data.strip(),
+            "db_host":    db_host,
+            "db_port":    form.db_port.data.strip(),
+            "db_name":    db_name,
+            "db_user":    db_user,
+            "logo_path":  logo_path,
+        }
+        save_config(new_cfg)    
+        # ── 6. Initialise schema ──────────────────────────────────────────────
         init_db()
+        # ── 7. Create users and default settings ──────────────────────────────
         conn = get_db()
+        if not conn:
+            # get_db() swallows exceptions — retry directly to get the real error.
+            try:
+                mariadb.connect(
+                    user=db_user,
+                    password=db_password,
+                    host=db_host,
+                    port=db_port,
+                    database=db_name,
+                )
+                # Connected fine — something else is wrong (config/env not written).
+                flash(
+                    "Schema initialised but the app could not load its own config. "
+                    "Check that config.json and .env are writable inside the container.",
+                    "danger",
+                )
+            except mariadb.Error as ex:
+                flash(
+                    f"Schema initialised but reconnection failed: {ex} "
+                    f"(host={db_host}, port={db_port}, user={db_user}, db={db_name})",
+                    "danger",
+                )
+            return render_template("setup.html", form=form, configured=False)
         cur = conn.cursor()
         create_users(
             cur,
-            {"username": form.admin_username.data, "password": form.admin_password.data},
-            {"username": form.default_user_username.data, "password": form.default_user_password.data}
-            if form.default_user_username.data and form.default_user_password.data
-            else None
+            {
+                "username": form.admin_username.data,
+                "password": form.admin_password.data
+            },
+            {
+                "username": form.default_user_username.data,
+                "password": form.default_user_password.data
+            } if form.default_user_username.data and form.default_user_password.data else None
         )
-        cur.execute("REPLACE INTO settings (setting_key, setting_value) VALUES ('site_name', 'Inventory')")
+        cur.execute(
+            "REPLACE INTO settings (setting_key, setting_value) VALUES ('site_name', %s)",
+            (form.app_domain.data.strip(),)
+        )
         if logo_path:
-            cur.execute("REPLACE INTO settings (setting_key, setting_value) VALUES ('logo_path', %s)", (logo_path,))
+            cur.execute(
+                "REPLACE INTO settings (setting_key, setting_value) VALUES ('logo_path', %s)",
+                (logo_path,)
+            )
         conn.commit()
         cur.close()
         conn.close()
+        # ── 8. Harden MariaDB ─────────────────────────────────────────────────
+        # Root gets a random password that is never stored — effectively locked.
+        # If manual access is ever needed: docker exec -it mariaDB mariadb-admin
+        try:
+            root_cur.execute(
+                "ALTER USER 'root'@'localhost' IDENTIFIED BY %s",
+                (secrets.token_urlsafe(32),)
+            )
+            root_cur.execute("DELETE FROM mysql.user WHERE User=''")
+            root_cur.execute(
+                "DELETE FROM mysql.user WHERE User='root' "
+                "AND Host NOT IN ('localhost', '127.0.0.1', '::1')"
+            )
+            root_cur.execute("DROP DATABASE IF EXISTS test")
+            root_cur.execute(
+                "DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%%'"
+            )
+            root_cur.execute("FLUSH PRIVILEGES")
+            root_conn.commit()
+        except mariadb.Error as ex:
+            root_conn.close()
+            flash(f"Database hardening failed: {ex}", "danger")
+            return render_template("setup.html", form=form, configured=False)
+        finally:
+            root_cur.close()
+            root_conn.close()
         flash("Setup complete. Please log in.", "success")
         return redirect(url_for("login"))
     return render_template("setup.html", form=form, configured=False)
@@ -169,7 +269,7 @@ def setup():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     cfg = load_config()
-    if not cfg.get("configured"):
+    if not cfg.get("configured", False):
         return redirect(url_for("setup"))
     form = LoginForm()
     if form.validate_on_submit():
@@ -942,7 +1042,7 @@ def create_app():
     cfg = load_config()
     # Set the key during app initialization
     app.secret_key = get_or_create_flask_secret()
-    if not cfg.get("configured"):
+    if not cfg.get("configured", False):
         print("WARNING: App not configured. Visit /setup to initialize.")
     else:
         try:
@@ -996,3 +1096,9 @@ def trigger_update():
             yield f"data: ERROR: Failed to communicate with Watchtower: {str(e)}\n\n"
             yield "data: DONE\n\n"
     return Response(generate_output(), mimetype='text/event-stream')
+
+
+
+application = create_app()
+if __name__ == "__main__":
+    application.run(host="0.0.0.0", port=8000, debug=False)

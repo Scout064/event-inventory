@@ -16,6 +16,5 @@ CREATE TABLE IF NOT EXISTS settings (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ALWAYS AT THE END: Update to the latest version
--- We use INSERT to ensure the version is recorded, 
--- and the update.sh script cleans up older rows.
-INSERT INTO schema_version (version) VALUES (3);
+INSERT IGNORE INTO schema_version (version) VALUES (3);
+

@@ -1,8 +1,12 @@
 import re
 from functools import wraps
-from flask import flash, redirect, url_for, current_app
+from flask import (
+    flash, redirect, url_for, current_app,
+    g
+)
 from flask_login import current_user, UserMixin
 from wtforms.validators import ValidationError
+
 
 LEET_MAP = str.maketrans({
     "0": "o",
@@ -86,12 +90,16 @@ def is_forbidden_username(username: str) -> bool:
 
 class ReservedUsername:
     def __call__(self, form, field):
-        username = field.data.strip()
-        normalized = normalize_username(username)
+        # During initial setup no user is logged in — skip all checks
+        if not current_user.is_authenticated:
+            return
         # Allow admins to bypass
         if getattr(current_user, "is_admin", False):
             return
+        username = field.data.strip()
+        normalized = normalize_username(username)
         if normalized in RESERVED_USERNAMES:
             raise ValidationError("This username is reserved.")
         if RESERVED_PATTERNS.search(normalized):
             raise ValidationError("This username is too similar to an administrator account.")
+

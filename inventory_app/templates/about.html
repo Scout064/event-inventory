@@ -27,6 +27,7 @@
                 {% endif %}
             </div>
 
+            
             {% if current_user.is_admin and stats %}
             <h6 class="text-uppercase text-muted mb-3 mt-4">Server Statistics</h6>
             <div class="row text-start mb-4 g-2">
@@ -123,18 +124,27 @@
 {% if current_user.is_admin %}
 <script>
 document.getElementById('updateBtn')?.addEventListener('click', async function() {
-    if (!confirm('Are you sure you want to run the system update? This will pull the latest code and restart the web server, causing brief downtime.')) return;
+    if (!confirm('Are you sure you want to run the system update? This will tell Watchtower to pull the latest Docker image and recreate the container, causing brief downtime.')) return;
     
     this.disabled = true;
     const container = document.getElementById('updateContainer');
     const logEl = document.getElementById('updateLog');
+    const progressBar = document.getElementById('updateProgressBar'); // Added to update the UI
     
     container.style.display = 'block';
-    logEl.textContent = "Initializing update sequence...\n";
+    logEl.textContent = "Initializing update sequence via Watchtower...\n";
+    
+    if (progressBar) {
+        progressBar.className = "progress-bar progress-bar-striped progress-bar-animated bg-warning text-dark fw-bold";
+        progressBar.innerText = "Updating... Do not close this page.";
+    }
     
     try {
-        // Trigger the backend route that streams the bash script output
+        // Trigger the backend route that calls Watchtower
         const response = await fetch('{{ url_for("trigger_update") }}', { method: 'POST' });
+        
+        if (!response.body) throw new Error("ReadableStream not supported.");
+        
         const reader = response.body.getReader();
         const decoder = new TextDecoder("utf-8");
         
@@ -149,9 +159,17 @@ document.getElementById('updateBtn')?.addEventListener('click', async function()
             lines.forEach(line => {
                 if (line.startsWith('data: ')) {
                     const msg = line.substring(6);
+                    
                     if (msg === "DONE") {
-                        logEl.textContent += "\nUpdate script finished successfully. Reloading interface...\n";
+                        if (progressBar) {
+                            progressBar.className = "progress-bar bg-success fw-bold";
+                            progressBar.innerText = "Check complete. System is up to date.";
+                        }
+                        logEl.textContent += "\nWatchtower check finished. No new image found. Reloading interface...\n";
                         setTimeout(() => window.location.reload(), 2000);
+                    } else if (msg === "RESTARTING") {
+                        // Python route caught a disconnect. Manually throw to trigger the catch block!
+                        throw new Error("Container restart initiated.");
                     } else {
                         logEl.textContent += msg + "\n";
                         logEl.scrollTop = logEl.scrollHeight; // Auto-scroll to bottom
@@ -160,24 +178,34 @@ document.getElementById('updateBtn')?.addEventListener('click', async function()
             });
         }
     } catch (err) {
-        // This catch block is highly likely to trigger because the `systemctl restart`
-        // command in your update.sh will abruptly kill the fetch request connection.
-        // This is actually a sign of success!
-        logEl.textContent += "\n[Server connection lost. The service is restarting.]\n";
+        // This catch block will trigger when Watchtower kills the Flask container mid-request.
+        // This is a sign of success!
+        logEl.textContent += "\n[Server connection lost. The Docker container is restarting.]\n";
         logEl.textContent += "Waiting for the web interface to come back online...\n";
+        
+        if (progressBar) {
+            progressBar.className = "progress-bar progress-bar-striped progress-bar-animated bg-info text-dark fw-bold";
+            progressBar.innerText = "System restarting... Waiting for server...";
+        }
         
         // Polling loop to quietly ping the server until it responds again
         const pingServer = setInterval(async () => {
             try {
-                // Ping the homepage to see if the server is back up
-                const check = await fetch('{{ url_for("index") }}', { method: 'HEAD' });
+                // Ping the homepage with a cache-buster to ensure we bypass browser caching
+                const check = await fetch('{{ url_for("index") }}?ts=' + new Date().getTime(), { method: 'HEAD' });
+                
                 if (check.ok) {
                     clearInterval(pingServer);
                     logEl.textContent += "\nServer is back online! Reloading...\n";
+                    if (progressBar) {
+                        progressBar.className = "progress-bar bg-success fw-bold";
+                        progressBar.innerText = "Update complete! Reloading...";
+                    }
                     setTimeout(() => window.location.reload(), 1000);
                 }
             } catch (e) {
                 logEl.textContent += "."; // visual indicator that we are waiting
+                logEl.scrollTop = logEl.scrollHeight;
             }
         }, 2000);
     }

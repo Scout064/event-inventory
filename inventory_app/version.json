@@ -1,5 +1,5 @@
 {
-  "version": "v1.2.1",
-  "buildDate": "2026-03-23T23:08:46+01:00",
-  "branch": "main"
+  "version": "v1.2.1-alpha.25",
+  "buildDate": "2026-03-26T10:55:00+01:00",
+  "branch": "move-to-docker"
 }

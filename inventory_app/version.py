@@ -3,6 +3,7 @@ import json
 import os
 import time
 from packaging import version
+from datetime import datetime
 
 GITHUB_OWNER = "Scout064"
 GITHUB_REPO = "event-inventory"
@@ -20,14 +21,14 @@ def get_github_releases():
 
     url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases"
     try:
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, timeout=10, headers={"Accept": "application/vnd.github+json"})
         response.raise_for_status()
         releases = []
         for r in response.json():
             releases.append({
                 "name": r["name"],
                 "tag": r["tag_name"],
-                "version": r["tag_name"],
+                "version": r["tag_name"].lstrip("v"),
                 "prerelease": r["prerelease"],
                 "draft": r["draft"],
                 "published": r["published_at"],
@@ -44,14 +45,20 @@ def get_github_releases():
 def get_stable_releases(limit=1):
     releases = get_github_releases()
     stable_releases = [r for r in releases if not r["prerelease"] and not r["draft"]]
-    stable_releases.sort(key=lambda r: r["published"], reverse=True)
+    stable_releases.sort(
+        key=lambda r: datetime.fromisoformat(r["published"].replace("Z", "+00:00")),
+        reverse=True
+    )
     return stable_releases[:limit]
 
 
 def get_beta_releases(limit=5):
     releases = get_github_releases()
     beta_releases = [r for r in releases if r["prerelease"] and not r["draft"]]
-    beta_releases.sort(key=lambda r: r["published"], reverse=True)
+    beta_releases.sort(
+        key=lambda r: datetime.fromisoformat(r["published"].replace("Z", "+00:00")),
+        reverse=True
+    )
     return beta_releases[:limit]
 
 
@@ -70,7 +77,6 @@ def get_build_date():
             data = json.load(f)
         date_str = data.get("buildDate", "Unknown")
         if date_str != "Unknown":
-            from datetime import datetime
             dt = datetime.fromisoformat(date_str)
             return dt.strftime("%B %d, %Y at %H:%M")
         return date_str

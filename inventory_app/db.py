@@ -2,9 +2,12 @@ import os
 import json
 import mariadb
 from werkzeug.security import generate_password_hash
+from dotenv import load_dotenv
+
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(APP_DIR, "config.json")
+load_dotenv(os.path.join(APP_DIR, ".env"))
 
 
 def load_config():
@@ -21,8 +24,11 @@ def save_config(cfg):
 
 def get_db():
     cfg = load_config()
-    if not cfg.get("configured"):
+    if not cfg.get("configured", False):
         return None
+    # Re-read .env on every call so all Gunicorn workers pick up
+    # DB_PASS (and other secrets) written after /setup runs.
+    load_dotenv(os.path.join(APP_DIR, ".env"), override=True)
     try:
         conn = mariadb.connect(
             user=cfg["db_user"],
@@ -41,17 +47,26 @@ def init_db():
     if not conn:
         return
     cur = conn.cursor()
-    schema_path = os.path.join(APP_DIR, "schema.sql")
-    if os.path.exists(schema_path):
-        with open(schema_path, "r") as f:
+    for filename in ("schema.sql", "migrations.sql"):
+        sql_path = os.path.join(APP_DIR, filename)
+        if not os.path.exists(sql_path):
+            print(f"[init_db] {filename} not found, skipping.")
+            continue
+        with open(sql_path, "r") as f:
             sql_commands = f.read().split(';')
         for command in sql_commands:
-            if command.strip():
-                try:
-                    cur.execute(command)
-                except mariadb.Error as e:
-                    print(f"Error executing command: {e}")
+            # Skip empty lines and comment-only blocks
+            stripped = command.strip()
+            if not stripped or all(
+                line.startswith('--') for line in stripped.splitlines() if line.strip()
+            ):
+                continue
+            try:
+                cur.execute(command)
+            except mariadb.Error as e:
+                print(f"[init_db] Error in {filename}: {e}")
         conn.commit()
+        print(f"[init_db] {filename} applied.")
     cur.close()
     conn.close()
 
@@ -174,3 +189,4 @@ def process_item_row(cur, row):
     except Exception as e:
         print(f"Row Exception: {e}")
         return 3
+

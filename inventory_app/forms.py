@@ -16,7 +16,7 @@ class SetupForm(FlaskForm):
         validators=[DataRequired()],
         default="localhost:8000"
     )
-    db_host = StringField("DB Host", validators=[DataRequired()], default="localhost")
+    db_host = StringField("DB Host", validators=[DataRequired()], default="db")
     db_port = StringField("DB Port", validators=[DataRequired()], default="3306")
     db_name = StringField(
         "DB Name", validators=[DataRequired()], default="inventory_db"
@@ -134,3 +134,4 @@ class UserProfileForm(FlaskForm):
     password = PasswordField("New Password (leave blank to keep current)", validators=[Optional(), Length(min=6)])
     confirm_password = PasswordField("Confirm New Password", validators=[EqualTo('password', message='Passwords must match')])
     submit = SubmitField("Save Profile")
+

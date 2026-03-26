@@ -12,7 +12,7 @@ services:
       - db_data:/var/lib/mysql
   # --- 2. THE APP ---
   Event_Inventory:
-    image: ghcr.io/scout064/event-inventory-licensed:latest
+    image: ghcr.io/scout064/event-inventory:latest
     container_name: inventory
     restart: unless-stopped
     depends_on:
@@ -31,9 +31,7 @@ services:
       - "com.centurylinklabs.watchtower.enable=true"
 
   # --- 3. THE AUTOMATION ---
-  # Option B: Manual trigger via HTTP API
-  # To use this instead, comment out Option A above and uncomment below.
-  # Make sure WATCHTOWER_HTTP_API_TOKEN matches WATCHTOWER_TOKEN in your Flask config.
+  # Option A: Automatic polling (checks every 24h)
   watchtower:
     image: containrrr/watchtower
     container_name: watchtower
@@ -42,9 +40,24 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - WATCHTOWER_CLEANUP=true
-      - WATCHTOWER_HTTP_API_UPDATE=true
-      - WATCHTOWER_HTTP_API_TOKEN=${WATCHTOWER_TOKEN}  # injected from .env at runtime
+      - WATCHTOWER_POLL_INTERVAL=86400
       - WATCHTOWER_LABEL_ENABLE=true
+
+ # Option B: Manual trigger via HTTP API
+ # To use this instead, comment out Option A above and uncomment below.
+ # Make sure WATCHTOWER_HTTP_API_TOKEN matches WATCHTOWER_TOKEN in your Flask config.
+ #
+ # watchtower:
+ #   image: containrrr/watchtower
+ #   container_name: watchtower
+ #   restart: unless-stopped
+ #   volumes:
+ #     - /var/run/docker.sock:/var/run/docker.sock
+ #   environment:
+ #     - WATCHTOWER_CLEANUP=true
+ #     - WATCHTOWER_HTTP_API_UPDATE=true
+ #     - WATCHTOWER_HTTP_API_TOKEN=${WATCHTOWER_TOKEN}  # injected from .env at runtime
+ #     - WATCHTOWER_LABEL_ENABLE=true
 
   # --- 3. THE WEB INTERFACE ---
   portainer:
