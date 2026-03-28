@@ -60,21 +60,41 @@ WATCHTOWER_URL = "http://watchtower:8080/v1/update"
 WATCHTOWER_TOKEN = os.environ.get("WATCHTOWER_TOKEN")
 
 
+# ONLY NEEDED IF NO PROXY IS USED (PROXY RECOMMENDED!)
 @app.before_request
 def enforce_https():
+    """Redirects non-HTTPS, non-LAN requests to the HTTPS equivalent.
+
+    Skipped entirely if the app has not been configured yet (i.e., /setup
+    has not been completed), because no app_domain is available to redirect to.
+
+    Security note (CWE-601 - Open Redirect):
+    The redirect URL is built from the configured app_domain (trusted) and
+    request.path (normalised by Flask), NOT from request.full_path or the
+    Host header, which are attacker-controllable. This prevents //evil.com
+    redirect injection via crafted path prefixes.
+    """
     cfg = load_config()
     if not cfg.get("configured"):
         return
     forwarded_proto = request.headers.get("X-Forwarded-Proto", "").lower()
     is_secure = request.is_secure or forwarded_proto == "https"
     remote_ip = request.remote_addr or ""
-    if not is_secure and not LAN_REGEX.match(remote_ip):
-        domain = cfg.get("app_domain")
-        if not domain:
-            abort(400, description="HTTPS enforcement failed: No trusted app_domain configured.")
-        path = request.full_path
-        secure_url = f"https://{domain}{path}"
-        return redirect(secure_url, code=301)
+    if is_secure or LAN_REGEX.match(remote_ip):
+        return
+    domain = cfg.get("app_domain")
+    if not domain:
+        abort(400, description="HTTPS enforcement failed: No trusted app_domain configured.")
+    # Rebuild the URL from only trusted components - never from user-supplied input.
+    # request.path is the decoded path only (no host, no query string).
+    # request.query_string is raw query bytes, not controlled via path traversal.
+    # Stripping leading slashes and rejoining prevents //evil.com-style open redirects.
+    safe_path = "/" + request.path.lstrip("/")
+    query = request.query_string.decode("utf-8", errors="replace")
+    safe_url = f"https://{domain}{safe_path}"
+    if query:
+        safe_url = f"{safe_url}?{query}"
+    return redirect(safe_url, code=301)
 
 
 @login_manager.user_loader
