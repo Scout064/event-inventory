@@ -2,7 +2,7 @@
 [![CodeQL Advanced](https://github.com/Scout064/event-inventory/actions/workflows/codeql.yml/badge.svg)](https://github.com/Scout064/event-inventory/actions/workflows/codeql.yml)
 [![Dependabot Updates](https://github.com/Scout064/event-inventory/actions/workflows/dependabot/dependabot-updates/badge.svg)](https://github.com/Scout064/event-inventory/actions/workflows/dependabot/dependabot-updates)
 [![Dependency review](https://github.com/Scout064/event-inventory/actions/workflows/dependency-review.yml/badge.svg)](https://github.com/Scout064/event-inventory/actions/workflows/dependency-review.yml)
-[![Build and Push Docker Image](https://github.com/Scout064/event-inventory/actions/workflows/release-docker.yml/badge.svg?branch=main)](https://github.com/Scout064/event-inventory/actions/workflows/release-docker.yml)
+
 
 # Event Inventory
 
