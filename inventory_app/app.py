@@ -1055,7 +1055,7 @@ def admin_user_delete(user_id):
 
 @app.route('/uploads/<path:filename>')
 def uploads(filename):
-    return send_from_directory('uploads', filename)
+    return send_from_directory(os.path.join(APP_DIR, 'uploads'), filename)
 
 
 def create_app():
