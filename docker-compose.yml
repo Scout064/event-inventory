@@ -12,8 +12,7 @@ services:
       - db_data:/var/lib/mysql
   # --- 2. THE APP ---
   Event_Inventory:
-    image: ghcr.io/scout064/event-inventory-licensed
-:latest
+    image: ghcr.io/scout064/event-inventory-licensed:latest
     container_name: inventory
     restart: unless-stopped
     depends_on:
