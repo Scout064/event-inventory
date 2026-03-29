@@ -79,3 +79,4 @@ volumes:
   portainer-data:
   backups:
   db_data:
+  uploads_data:
