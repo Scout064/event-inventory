@@ -20,6 +20,7 @@ services:
     volumes:
       - ./inventory_app/config.json:/inventory_app/inventory_app/config.json
       - ./inventory_app/.env:/inventory_app/inventory_app/.env
+      - uploads_data:/inventory_app/inventory_app/uploads
       - backups:/inventory_app/backups
     environment:
       # Injected from root .env at compose startup — never hardcoded.
