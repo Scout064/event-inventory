@@ -210,7 +210,7 @@ The following features are planned for future releases. All roadmap items requir
 
 ---
 
-### 🚧 Redesign Start Page 🔑
+### 🚧 Redesign Start Page 🔑 (in Beta Phase)
 
 *Priority: High — next milestone*
 
@@ -225,7 +225,7 @@ The current dashboard (`/`) is a static placeholder. The planned redesign will t
 
 ---
 
-### 🚧 Calendar 🔑
+### 🚧 Calendar 🔑 (in Beta Phase)
 
 *Priority: High*
 
@@ -240,7 +240,7 @@ A visual calendar view for productions and scheduled events:
 
 ---
 
-### 🚧 User Scheduling 🔑
+### 🚧 User Scheduling 🔑 (in Beta Phase)
 
 *Priority: Medium*
 
@@ -255,7 +255,7 @@ Assign users to specific productions or shifts:
 
 ---
 
-### 🚧 Chat Function 🔑
+### 🚧 Chat Function 🔑 (in Beta Phase)
 
 *Priority: Medium*
 
