@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # --- 1. THE DATABASE ---
   db:
@@ -21,6 +19,7 @@ services:
       - ./inventory_app/config.json:/inventory_app/inventory_app/config.json
       - ./inventory_app/.env:/inventory_app/inventory_app/.env
       - uploads_data:/inventory_app/inventory_app/uploads
+      - static_data:/inventory_app/inventory_app/static
       - backups:/inventory_app/backups
     environment:
       # Injected from root .env at compose startup — never hardcoded.
@@ -32,10 +31,9 @@ services:
       - "com.centurylinklabs.watchtower.enable=true"
 
   # --- 3. THE AUTOMATION ---
- # Option B: Manual trigger via HTTP API
- # To use this instead, comment out Option A above and uncomment below.
- # Make sure WATCHTOWER_HTTP_API_TOKEN matches WATCHTOWER_TOKEN in your Flask config.
- #
+  # Option B: Manual trigger via HTTP API
+  # To use this instead, comment out Option A above and uncomment below.
+  # Make sure WATCHTOWER_HTTP_API_TOKEN matches WATCHTOWER_TOKEN in your Flask config.
   watchtower:
     image: containrrr/watchtower
     container_name: watchtower
@@ -68,3 +66,4 @@ volumes:
   backups:
   db_data:
   uploads_data:
+  static_data:
