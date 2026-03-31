@@ -7,6 +7,7 @@
 # Event Inventory (Licensed)
 
 > Self-hosted inventory management system for event and production equipment
+>
 > Packages: https://github.com/Scout064/event-inventory-licensed/pkgs/container/event-inventory-licensed
 
 ---
