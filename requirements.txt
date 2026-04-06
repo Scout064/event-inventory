@@ -3,7 +3,7 @@ Flask-Login==0.6.3
 Flask-WTF==1.2.2
 WTForms==3.2.1
 Pillow==12.1.1
-Werkzeug==3.1.7
+Werkzeug==3.1.8
 reportlab==4.4.10
 qrcode==8.2
 mariadb==1.1.14
